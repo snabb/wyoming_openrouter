@@ -128,8 +128,14 @@ jobs:
               uses: docker/metadata-action@v6
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  # The version tag is required, not cosmetic -- Supervisor
+                  # pulls "<image>:<config.yaml version>" to install/update
+                  # the add-on, so every pyproject.toml version bump must be
+                  # published under that exact tag or installs fail with an
+                  # opaque "unknown error" (missing manifest).
                   tags: |
                       type=raw,value=latest
+                      type=raw,value=${{ steps.version.outputs.version }}
                       type=raw,value=${{ steps.version.outputs.short_sha }}
                   labels: |
                       org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
