@@ -187,14 +187,32 @@ jobs:
               run: uv sync --all-extras --dev
 
             - name: Pull and start container
-              # No OPENROUTER_API_KEY here on purpose -- the smoke test only
-              # checks the Wyoming Describe/Info handshake and healthcheck,
-              # never a real transcription, so no API key or per-run cost is
-              # needed in CI. Server still starts fine without one (it only
-              # fails a real transcription request, not startup).
+              # The API key here is never used for a real request -- the smoke
+              # test only checks the Wyoming Describe/Info handshake and
+              # healthcheck for a single dummy task, so no per-run cost is
+              # needed in CI. A config file is required (no flat-env-var
+              # fallback exists anymore), so a minimal one-task config is
+              # mounted via the same CONFIG_PATH_OVERRIDE standalone-Docker
+              # mechanism documented in README.md.
               run: |
+                  cat > /tmp/smoke-tasks.json <<'JSON'
+                  {
+                    "tasks": [
+                      {
+                        "name": "smoke-test",
+                        "api_key": "unused-in-ci",
+                        "type": "stt",
+                        "port": 10300,
+                        "model": "openai/gpt-4o-mini-transcribe"
+                      }
+                    ]
+                  }
+                  JSON
                   docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-                  docker run -d --name smoke-test -p 10300:10300 -e OPENROUTER_API_KEY=unused-in-ci "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+                  docker run -d --name smoke-test -p 10300:10300 \
+                    -v /tmp/smoke-tasks.json:/config/tasks.json:ro \
+                    -e CONFIG_PATH_OVERRIDE=/config/tasks.json \
+                    "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
             - name: Wait for healthy
               run: |
