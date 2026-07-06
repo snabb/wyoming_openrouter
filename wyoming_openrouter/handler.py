@@ -184,5 +184,12 @@ class OpenRouterEventHandler(AsyncEventHandler):
             result.elapsed_ms,
             result.cost,
         )
+        # Debug-only, separate from the line above: transcribed speech content
+        # is more sensitive than request metadata, so it's gated behind
+        # --debug rather than always logged. usage is the raw dict from
+        # OpenRouter and varies by model (seconds vs. input/output/total
+        # tokens) -- logged as-is rather than picking fields, so nothing is
+        # silently dropped when a new model/provider returns something new.
+        _LOGGER.debug("Transcript text=%r usage=%s", result.text, result.usage)
         self.metrics.record(result.elapsed_ms, result.cost)
         await push_to_supervisor(self.metrics)
