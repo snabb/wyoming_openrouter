@@ -5,9 +5,10 @@ name: Wyoming OpenRouter
 version: 0.1.0
 slug: wyoming_openrouter
 description: >-
-    Speech-to-text using OpenRouter's hosted STT models (Whisper, GPT-4o
-    Transcribe, and others). Requires your own OpenRouter API key; billed
-    per-request against your OpenRouter account.
+    Speech-to-text and text-to-speech using OpenRouter's hosted models.
+    Configure multiple independent tasks (each its own model/voice/port);
+    add one "Wyoming Protocol" integration per task in Home Assistant.
+    Requires your own OpenRouter API key(s); billed per-request.
 url: https://github.com/snabb/wyoming_openrouter
 arch:
     - amd64
@@ -18,53 +19,117 @@ init: false
 startup: application
 boot: auto
 
-# Auto-discovery via Wyoming protocol
+# Auto-discovery via Wyoming protocol (this add-on sends one discovery
+# message per configured task/port -- see run.sh)
 discovery:
     - wyoming
 
 # Grants access to Home Assistant's own Core API through the Supervisor proxy
 # (http://supervisor/core/api/..., authenticated with SUPERVISOR_TOKEN), used
-# to push request-count/cost/latency sensor entities. See ha_metrics.py.
+# to push per-task request-count/cost/latency sensor entities. See
+# ha_metrics.py.
 homeassistant_api: true
 
-# Network
+# Network. A fixed range of 20 ports is reserved since Supervisor requires
+# ports to be enumerated at build time (no dynamic runtime port declaration
+# exists) -- each task's `port` option must fall in this range. Covers the
+# entire live OpenRouter STT+TTS catalog (~19 models as of writing) with a
+# little headroom. All unpublished (null) by default; only relevant for
+# optional external-LAN access, since Home Assistant Core already reaches
+# this add-on's containers over the internal Supervisor network regardless
+# of what's published here.
 ports:
-    10300/tcp:
+    10300/tcp: null
+    10301/tcp: null
+    10302/tcp: null
+    10303/tcp: null
+    10304/tcp: null
+    10305/tcp: null
+    10306/tcp: null
+    10307/tcp: null
+    10308/tcp: null
+    10309/tcp: null
+    10310/tcp: null
+    10311/tcp: null
+    10312/tcp: null
+    10313/tcp: null
+    10314/tcp: null
+    10315/tcp: null
+    10316/tcp: null
+    10317/tcp: null
+    10318/tcp: null
+    10319/tcp: null
 ports_description:
-    10300/tcp: Wyoming protocol
+    10300/tcp: Task port (if configured)
+    10301/tcp: Task port (if configured)
+    10302/tcp: Task port (if configured)
+    10303/tcp: Task port (if configured)
+    10304/tcp: Task port (if configured)
+    10305/tcp: Task port (if configured)
+    10306/tcp: Task port (if configured)
+    10307/tcp: Task port (if configured)
+    10308/tcp: Task port (if configured)
+    10309/tcp: Task port (if configured)
+    10310/tcp: Task port (if configured)
+    10311/tcp: Task port (if configured)
+    10312/tcp: Task port (if configured)
+    10313/tcp: Task port (if configured)
+    10314/tcp: Task port (if configured)
+    10315/tcp: Task port (if configured)
+    10316/tcp: Task port (if configured)
+    10317/tcp: Task port (if configured)
+    10318/tcp: Task port (if configured)
+    10319/tcp: Task port (if configured)
 
 # Host access
 host_network: false
 hassio_api: false
 
 # Configuration options exposed in UI.
-# `models` is free text (any OpenRouter model slug), not a fixed enum, so new
-# OpenRouter STT models work without an app update. Check the app's log tab
-# after startup: the server fetches and logs the live OpenRouter STT model
-# catalog with current prices.
+# Each task is fully self-contained (including its own api_key -- reuse the
+# same key across multiple tasks by repeating the value). `model` is free
+# text (any OpenRouter model slug), not a fixed enum, so new OpenRouter
+# models work without an app update. Check the app's log tab after startup:
+# the server fetches and logs the live OpenRouter STT and TTS model catalogs
+# with current prices. Up to 20 tasks, one per reserved port above; add one
+# "Wyoming Protocol" integration entry per task in Home Assistant.
 options:
-    api_key: ""
-    models:
-        - openai/gpt-4o-mini-transcribe
-    languages:
-        - en
-    default_language: ""
-    timeout: 60
     debug: false
+    tasks:
+        - name: kitchen-stt
+          api_key: ""
+          type: stt
+          port: 10300
+          model: openai/gpt-4o-mini-transcribe
+          timeout: 60
+          language: en
+          default_language: ""
+          temperature: 0.0
+          voice: ""
+          speed: 1.0
+          audio_format: pcm
+          provider: ""
 
 schema:
-    api_key: password
-    models:
-        - str
-    languages:
-        - str
-    default_language: str?
-    timeout: int(1,300)
     debug: bool
+    tasks:
+        - name: str
+          api_key: password
+          type: "list(stt|tts)"
+          port: port
+          model: str
+          timeout: "int(1,300)?"
+          language: "str?"
+          default_language: "str?"
+          temperature: "float(0,1)?"
+          voice: "str?"
+          speed: "float(0,10)?"
+          audio_format: "list(pcm|mp3)?"
+          provider: "str?"
 
 # Panel
 panel_icon: mdi:microphone-message
-panel_title: OpenRouter STT
+panel_title: OpenRouter Voice
 
 # Documentation
 # Supervisor pulls ghcr.io/snabb/wyoming_openrouter:<version> (the version

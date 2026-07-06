@@ -1,4 +1,4 @@
-"""Wyoming event handler for OpenRouter speech-to-text."""
+"""Wyoming event handler for one OpenRouter speech-to-text task."""
 
 import asyncio
 import io
@@ -13,42 +13,33 @@ from wyoming.info import AsrModel, AsrProgram, Attribution, Describe, Info
 from wyoming.server import AsyncEventHandler
 
 from . import __version__, openrouter
+from .config import TaskConfig
 from .ha_metrics import Metrics, push_to_supervisor
-
-_LOGGER = logging.getLogger(__name__)
 
 _ATTRIBUTION = Attribution(name="OpenRouter", url="https://openrouter.ai")
 
 
-def get_wyoming_info(models: list[str], languages: list[str]) -> Info:
-    """Create Wyoming info describing the configured OpenRouter STT models.
-
-    Each configured model slug becomes one AsrModel under a single AsrProgram
-    (Home Assistant's own wyoming integration only ever looks at info.asr[0]
-    and unions all installed AsrModel.languages into supported_languages, so
-    there is no benefit to multiple AsrPrograms here).
-    """
-    asr_models = [
-        AsrModel(
-            name=model,
-            attribution=_ATTRIBUTION,
-            installed=True,
-            description=f"OpenRouter STT model: {model}",
-            version=None,
-            languages=list(languages),
-        )
-        for model in models
-    ]
-
+def get_stt_wyoming_info(task: TaskConfig) -> Info:
+    """Create Wyoming info describing this task's single dedicated STT model."""
+    languages = [task.language] if task.language else []
     return Info(
         asr=[
             AsrProgram(
                 name="openrouter",
                 attribution=_ATTRIBUTION,
                 installed=True,
-                description="OpenRouter speech-to-text",
+                description=f"OpenRouter speech-to-text: {task.name}",
                 version=__version__,
-                models=asr_models,
+                models=[
+                    AsrModel(
+                        name=task.model,
+                        attribution=_ATTRIBUTION,
+                        installed=True,
+                        description=f"OpenRouter STT model: {task.model}",
+                        version=None,
+                        languages=languages,
+                    )
+                ],
             )
         ]
     )
@@ -65,13 +56,13 @@ def _build_wav(pcm_bytes: bytes, rate: int, width: int, channels: int) -> bytes:
     return buffer.getvalue()
 
 
-class OpenRouterEventHandler(AsyncEventHandler):
-    """Handle Wyoming ASR events by proxying accumulated audio to OpenRouter."""
+class OpenRouterSttEventHandler(AsyncEventHandler):
+    """Handle Wyoming ASR events for one task by proxying audio to OpenRouter."""
 
     def __init__(
         self,
         wyoming_info: Info,
-        cli_args,
+        task: TaskConfig,
         metrics: Metrics,
         *args,
         **kwargs,
@@ -79,44 +70,31 @@ class OpenRouterEventHandler(AsyncEventHandler):
         """Initialize handler."""
         super().__init__(*args, **kwargs)
         self.wyoming_info = wyoming_info
-        self.cli_args = cli_args
+        self.task = task
         self.metrics = metrics
+        self._logger = logging.getLogger(f"wyoming_openrouter.task.{task.slug}")
 
         self._audio_chunks: list[bytes] = []
         self._audio_rate = 16000
         self._audio_width = 2
         self._audio_channels = 1
         self._requested_language: Optional[str] = None
-        self._requested_model: str = cli_args.models[0]
-
-    def _resolve_model(self, transcribe: Transcribe) -> str:
-        """Honor Transcribe.name if it names one of the configured models.
-
-        Home Assistant's own wyoming integration never sets this field, so in
-        the normal HA flow this always falls back to the first configured
-        (default) model -- but any other Wyoming client that does pick a
-        model by name is still handled correctly.
-        """
-        if transcribe.name and transcribe.name in self.cli_args.models:
-            return transcribe.name
-        return self.cli_args.models[0]
 
     async def handle_event(self, event: Event) -> bool:
         """Handle Wyoming events."""
         if Describe.is_type(event.type):
             await self.write_event(self.wyoming_info.event())
-            _LOGGER.debug("Sent info in response to describe")
+            self._logger.debug("Sent info in response to describe")
             return True
 
         if Transcribe.is_type(event.type):
             transcribe = Transcribe.from_event(event)
             # Home Assistant always sets .language from the Assist pipeline's
             # STT language; pass it straight through. Only fall back to the
-            # configured --default-language hint when a client omits it
+            # configured default_language hint when a client omits it
             # entirely -- otherwise leave it unset and let the model
             # auto-detect.
-            self._requested_language = transcribe.language or self.cli_args.default_language
-            self._requested_model = self._resolve_model(transcribe)
+            self._requested_language = transcribe.language or self.task.default_language
             self._audio_chunks = []
             return True
 
@@ -158,17 +136,19 @@ class OpenRouterEventHandler(AsyncEventHandler):
         try:
             result = await asyncio.to_thread(
                 openrouter.transcribe,
-                self.cli_args.api_key,
-                self._requested_model,
+                self.task.api_key,
+                self.task.model,
                 wav_bytes,
                 self._requested_language,
-                self.cli_args.timeout,
+                self.task.temperature,
+                self.task.provider,
+                self.task.timeout,
             )
         except Exception:
             # Log and still return a clean (if unhelpful) response rather than
             # dropping the connection -- a single transient OpenRouter failure
             # shouldn't surface as a hard ERROR result in Home Assistant.
-            _LOGGER.exception("OpenRouter transcription request failed")
+            self._logger.exception("OpenRouter transcription request failed")
             await self.write_event(Transcript(text="").event())
             return
 
@@ -176,9 +156,9 @@ class OpenRouterEventHandler(AsyncEventHandler):
             Transcript(text=result.text, language=self._requested_language).event()
         )
 
-        _LOGGER.info(
+        self._logger.info(
             "Transcribe: model=%s language=%s audio=%.2fs latency=%dms cost=$%.6f",
-            self._requested_model,
+            self.task.model,
             self._requested_language or "auto",
             audio_seconds,
             result.elapsed_ms,
@@ -190,6 +170,6 @@ class OpenRouterEventHandler(AsyncEventHandler):
         # OpenRouter and varies by model (seconds vs. input/output/total
         # tokens) -- logged as-is rather than picking fields, so nothing is
         # silently dropped when a new model/provider returns something new.
-        _LOGGER.debug("Transcript text=%r usage=%s", result.text, result.usage)
+        self._logger.debug("Transcript text=%r usage=%s", result.text, result.usage)
         self.metrics.record(result.elapsed_ms, result.cost)
         await push_to_supervisor(self.metrics)

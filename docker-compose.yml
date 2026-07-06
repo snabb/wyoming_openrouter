@@ -8,12 +8,15 @@ services:
         # Binds on all interfaces (0.0.0.0) by default. If Home Assistant
         # reaches this host over a VPN/tunnel, bind to that specific
         # interface's IP instead by prefixing it, e.g.:
-        #     - 10.8.0.5:10300:10300/tcp
+        #     - 10.8.0.5:10300-10309:10300-10309/tcp
+        # Only the ports your tasks.json actually uses need to be published.
         ports:
-            - 10300:10300/tcp
+            - 10300-10309:10300-10309/tcp
+
+        volumes:
+            # Copy tasks.json.example to tasks.json and edit it first -- see
+            # README.md for the full field reference.
+            - ./tasks.json:/config/tasks.json:ro
 
         environment:
-            OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in your environment or .env file}
-            MODELS: openai/gpt-4o-mini-transcribe
-            LANGUAGES: en
-            DEBUG: 'false'
+            CONFIG_PATH_OVERRIDE: /config/tasks.json

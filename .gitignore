@@ -45,7 +45,13 @@ cover/
 
 # Environments
 .env
+tasks.json
 .venv
+
+# Generated reports
+model_matrix_report.md
+model_matrix_report.json
+.model_matrix_cache/
 env/
 venv/
 ENV/

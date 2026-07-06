@@ -1,41 +1,57 @@
 ---
 # Home Assistant app option names/descriptions shown in the Configuration tab.
 # https://developers.home-assistant.io/docs/add-ons/configuration#translating-add-on-options
+#
+# `tasks` is a nested list of objects (name/api_key/type/port/model/...) --
+# Supervisor's per-field translation for nested list items isn't
+# well-documented, so this single description covers the whole structure
+# rather than assuming each nested field gets its own tooltip.
 configuration:
-    api_key:
-        name: OpenRouter API key
-        description: >-
-            Your OpenRouter API key (https://openrouter.ai/keys). Every
-            transcription request is billed against your own OpenRouter
-            account.
-    models:
-        name: Models
-        description: >-
-            Comma-separated OpenRouter STT model slugs to advertise, e.g.
-            openai/gpt-4o-mini-transcribe or
-            openai/gpt-4o-mini-transcribe,openai/whisper-1. The first is the
-            default model used for every request from Home Assistant (Home
-            Assistant never picks between multiple models itself). Check this
-            app's log tab after startup for the current live OpenRouter STT
-            model catalog and prices before choosing.
-    languages:
-        name: Languages
-        description: >-
-            Languages to advertise to Home Assistant's UI. OpenRouter STT
-            models are generally multilingual and this list isn't enforced by
-            the server itself, just used to populate Home Assistant's
-            language selector.
-    default_language:
-        name: Default language hint
-        description: >-
-            Optional ISO-639-1 language hint (e.g. en) sent to OpenRouter only
-            when a request doesn't specify one. Leave empty to let the model
-            auto-detect the spoken language.
-    timeout:
-        name: Request timeout (seconds)
-        description: HTTP timeout for OpenRouter transcription requests.
     debug:
         name: Debug logging
         description: Show verbose logs for troubleshooting.
+    tasks:
+        name: Tasks
+        description: >-
+            One or more independent speech tasks, each its own OpenRouter
+            model and its own Wyoming port (10300-10319) -- add one "Wyoming
+            Protocol" integration entry per task in Home Assistant.
+            Fields: name (any label, used in logs and Home Assistant sensor
+            entity IDs); api_key (your OpenRouter API key -- reuse the same
+            key across tasks by repeating it, or use different keys per
+            task); type (stt or tts); port (10300-10319, must be unique);
+            model (any OpenRouter model slug -- check this app's log tab
+            after startup for the live STT/TTS model catalog and current
+            prices); timeout (HTTP timeout in seconds). STT-only: language
+            (advertised to Home Assistant's UI), default_language (hint sent
+            to OpenRouter only when a request doesn't specify one; leave
+            empty to auto-detect), temperature (0-1, sampling parameter).
+            TTS-only: voice (required -- valid values are model-specific,
+            see the model catalog), speed (playback speed multiplier),
+            audio_format (pcm or mp3 -- pcm needs no local decoding but not
+            every model supports it; mp3 is smaller to transfer but is
+            decoded locally via mpg123 before Wyoming delivery, which always
+            needs raw PCM regardless of this setting). Advanced: provider
+            (raw JSON string, passed through as OpenRouter's "provider"
+            field, e.g. for provider routing or Azure TTS style options).
 network:
-    10300/tcp: Wyoming protocol
+    10300/tcp: Task port (if configured)
+    10301/tcp: Task port (if configured)
+    10302/tcp: Task port (if configured)
+    10303/tcp: Task port (if configured)
+    10304/tcp: Task port (if configured)
+    10305/tcp: Task port (if configured)
+    10306/tcp: Task port (if configured)
+    10307/tcp: Task port (if configured)
+    10308/tcp: Task port (if configured)
+    10309/tcp: Task port (if configured)
+    10310/tcp: Task port (if configured)
+    10311/tcp: Task port (if configured)
+    10312/tcp: Task port (if configured)
+    10313/tcp: Task port (if configured)
+    10314/tcp: Task port (if configured)
+    10315/tcp: Task port (if configured)
+    10316/tcp: Task port (if configured)
+    10317/tcp: Task port (if configured)
+    10318/tcp: Task port (if configured)
+    10319/tcp: Task port (if configured)

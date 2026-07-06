@@ -1,0 +1,21 @@
+{
+  "tasks": [
+    {
+      "name": "kitchen-stt",
+      "api_key": "sk-or-v1-...",
+      "type": "stt",
+      "port": 10300,
+      "model": "openai/gpt-4o-mini-transcribe",
+      "language": "en"
+    },
+    {
+      "name": "assist-tts",
+      "api_key": "sk-or-v1-...",
+      "type": "tts",
+      "port": 10301,
+      "model": "hexgrad/kokoro-82m",
+      "voice": "af_nova",
+      "speed": 1.0
+    }
+  ]
+}

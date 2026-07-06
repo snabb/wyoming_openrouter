@@ -1,7 +1,10 @@
 # Wyoming OpenRouter Docker image (Alpine-based). This is a thin async HTTP
 # client (requests + wyoming), no local ML inference, so unlike some other
 # Wyoming server images there's no musl/glibc wheel-availability concern here
-# and no need for a second Dockerfile variant.
+# and no need for a second Dockerfile variant. mpg123 is the one non-Python
+# runtime dependency: a small (~1.7 MB with libs), purpose-built MPEG audio
+# decoder used to convert mp3 to raw PCM for TTS tasks whose model doesn't
+# support response_format=pcm directly (Wyoming always needs raw PCM).
 # Supports: amd64, aarch64.
 
 # ============================================
@@ -40,7 +43,8 @@ RUN apk add --no-cache \
     ca-certificates \
     netcat-openbsd \
     jq \
-    curl
+    curl \
+    mpg123
 
 COPY --from=builder /usr/lib/python3.14/site-packages /usr/lib/python3.14/site-packages
 COPY --from=builder /usr/bin/wyoming-openrouter /usr/bin/
@@ -48,11 +52,17 @@ COPY --from=builder /usr/bin/wyoming-openrouter /usr/bin/
 WORKDIR /app
 
 COPY run.sh /run.sh
-RUN chmod +x /run.sh
+COPY healthcheck.sh /healthcheck.sh
+RUN chmod +x /run.sh /healthcheck.sh
 
-EXPOSE 10300
+# A fixed range of 20 ports is reserved (config.yaml's `ports:` section
+# mirrors this) since each task listens on its own dedicated port and
+# Supervisor/Docker both need ports declared upfront rather than discovered
+# at runtime. Covers the entire live OpenRouter STT+TTS catalog (~19 models
+# as of writing) with a little headroom.
+EXPOSE 10300-10319
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD echo '{"type":"describe"}' | nc -w 5 localhost 10300 | grep -q "openrouter" || exit 1
+    CMD /healthcheck.sh
 
 CMD ["/run.sh"]
