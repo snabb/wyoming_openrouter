@@ -1,0 +1,6 @@
+---
+# Home Assistant App Repository (Supervisor add-on repository)
+# https://developers.home-assistant.io/docs/add-ons/repository
+name: Wyoming OpenRouter
+url: https://github.com/snabb/wyoming_openrouter
+maintainer: Janne Snabb <https://github.com/snabb>

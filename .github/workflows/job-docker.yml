@@ -1,0 +1,221 @@
+---
+name: docker
+
+on:
+    workflow_call:
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    build:
+        permissions:
+            contents: read
+            packages: write
+        strategy:
+            matrix:
+                # Native runner per architecture instead of QEMU emulation on
+                # ubuntu-latest. ubuntu-24.04-arm is a GitHub-hosted arm64
+                # runner, free and unlimited on public repos same as
+                # ubuntu-latest. Only one image variant here (unlike some
+                # other Wyoming server projects) -- this is a thin HTTP
+                # client with no architecture-sensitive native dependencies.
+                include:
+                    - platform: linux/amd64
+                      runner: ubuntu-latest
+                    - platform: linux/arm64
+                      runner: ubuntu-24.04-arm
+        runs-on: ${{ matrix.runner }}
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: Log in to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract Docker metadata
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  labels: |
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                  annotations: |
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+
+            # metadata-action auto-generates org.opencontainers.image.licenses
+            # from repo detection, which ends up meaningless/misleading for a
+            # multi-stage image bundling Alpine + several PyPI packages under
+            # one label -- drop it rather than assert a single license for
+            # the whole image. org.opencontainers.image.source is generated
+            # too and kept as-is (it's just the repo URL, unambiguous).
+            - name: Filter out the licenses label
+              id: labels
+              run: |
+                  {
+                      echo "labels<<LABELS_EOF"
+                      grep -v '^org\.opencontainers\.image\.licenses=' <<< "${{ steps.meta.outputs.labels }}"
+                      echo "LABELS_EOF"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Build and push by digest
+              id: build
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  platforms: ${{ matrix.platform }}
+                  labels: ${{ steps.labels.outputs.labels }}
+                  outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+                  cache-from: type=gha,scope=${{ matrix.platform }}
+                  cache-to: type=gha,scope=${{ matrix.platform }},mode=max
+
+            - name: Export digest
+              run: |
+                  mkdir -p /tmp/digests
+                  digest="${{ steps.build.outputs.digest }}"
+                  touch "/tmp/digests/${digest#sha256:}"
+
+            - name: Upload digest
+              uses: actions/upload-artifact@v7
+              with:
+                  name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+                  path: /tmp/digests/*
+                  if-no-files-found: error
+                  retention-days: 1
+
+    merge:
+        runs-on: ubuntu-latest
+        needs: build
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Extract version and short SHA
+              id: version
+              run: |
+                  version=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+            - name: Download digests
+              uses: actions/download-artifact@v8
+              with:
+                  path: /tmp/digests
+                  pattern: digests-*
+                  merge-multiple: true
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v4
+
+            - name: Log in to GHCR
+              uses: docker/login-action@v4
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract Docker metadata
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: |
+                      type=raw,value=latest
+                      type=raw,value=${{ steps.version.outputs.short_sha }}
+                  labels: |
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                  annotations: |
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+
+            - name: Create manifest list and push
+              working-directory: /tmp/digests
+              run: |
+                  # `imagetools create` doesn't copy labels from the source
+                  # per-platform images into the new index it builds -- the
+                  # index needs its own annotations, or GHCR's package page
+                  # shows "No description provided" even though the images
+                  # underneath have full OCI labels.
+                  TAGS=()
+                  while IFS= read -r tag; do
+                      TAGS+=(-t "$tag")
+                  done < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+                  ANNOTATIONS=()
+                  while IFS= read -r annotation; do
+                      key="${annotation#manifest:}"
+                      case "$key" in
+                          org.opencontainers.image.licenses=*) continue ;;
+                      esac
+                      ANNOTATIONS+=(--annotation "index:$key")
+                  done < <(jq -r '.annotations[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+                  docker buildx imagetools create \
+                    "${TAGS[@]}" \
+                    "${ANNOTATIONS[@]}" \
+                    $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+            - name: Inspect image
+              run: |
+                  docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
+    smoke-test:
+        runs-on: ubuntu-latest
+        needs: merge
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v8.2.0
+              with:
+                  version: latest
+                  enable-cache: true
+                  cache-dependency-glob: uv.lock
+
+            - name: Set up Python
+              run: uv python install
+
+            - name: Install wyoming client (for the smoke test script)
+              run: uv sync --all-extras --dev
+
+            - name: Pull and start container
+              # No OPENROUTER_API_KEY here on purpose -- the smoke test only
+              # checks the Wyoming Describe/Info handshake and healthcheck,
+              # never a real transcription, so no API key or per-run cost is
+              # needed in CI. Server still starts fine without one (it only
+              # fails a real transcription request, not startup).
+              run: |
+                  docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+                  docker run -d --name smoke-test -p 10300:10300 -e OPENROUTER_API_KEY=unused-in-ci "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
+            - name: Wait for healthy
+              run: |
+                  for i in $(seq 1 30); do
+                    status=$(docker inspect smoke-test --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+                    echo "[$i/30] health: $status"
+                    if [ "$status" = "healthy" ]; then
+                      exit 0
+                    fi
+                    sleep 5
+                  done
+                  echo "Timed out waiting for the container to become healthy"
+                  exit 1
+
+            - name: Describe/Info handshake smoke test
+              run: uv run python3 .github/scripts/smoke_test.py
+
+            - name: Dump container logs
+              if: always()
+              run: docker logs smoke-test
+
+            - name: Clean up
+              if: always()
+              run: docker rm -f smoke-test

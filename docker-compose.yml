@@ -1,0 +1,19 @@
+---
+services:
+    wyoming-openrouter:
+        image: ghcr.io/snabb/wyoming_openrouter:latest
+        container_name: wyoming-openrouter
+        restart: unless-stopped
+
+        # Binds on all interfaces (0.0.0.0) by default. If Home Assistant
+        # reaches this host over a VPN/tunnel, bind to that specific
+        # interface's IP instead by prefixing it, e.g.:
+        #     - 10.8.0.5:10300:10300/tcp
+        ports:
+            - 10300:10300/tcp
+
+        environment:
+            OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in your environment or .env file}
+            MODELS: openai/gpt-4o-mini-transcribe
+            LANGUAGES: en
+            DEBUG: 'false'

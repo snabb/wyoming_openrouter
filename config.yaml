@@ -1,0 +1,75 @@
+---
+# Home Assistant App Configuration (Supervisor add-on manifest)
+# https://developers.home-assistant.io/docs/add-ons/configuration
+name: Wyoming OpenRouter
+version: 0.1.0
+slug: wyoming_openrouter
+description: >-
+    Speech-to-text using OpenRouter's hosted STT models (Whisper, GPT-4o
+    Transcribe, and others). Requires your own OpenRouter API key; billed
+    per-request against your OpenRouter account.
+url: https://github.com/snabb/wyoming_openrouter
+arch:
+    - amd64
+    - aarch64
+
+# Startup configuration
+init: false
+startup: application
+boot: auto
+
+# Auto-discovery via Wyoming protocol
+discovery:
+    - wyoming
+
+# Grants access to Home Assistant's own Core API through the Supervisor proxy
+# (http://supervisor/core/api/..., authenticated with SUPERVISOR_TOKEN), used
+# to push request-count/cost/latency sensor entities. See ha_metrics.py.
+homeassistant_api: true
+
+# Network
+ports:
+    10300/tcp:
+ports_description:
+    10300/tcp: Wyoming protocol
+
+# Host access
+host_network: false
+hassio_api: false
+
+# Configuration options exposed in UI.
+# `models` is free text (any OpenRouter model slug), not a fixed enum, so new
+# OpenRouter STT models work without an app update. Check the app's log tab
+# after startup: the server fetches and logs the live OpenRouter STT model
+# catalog with current prices.
+options:
+    api_key: ""
+    models:
+        - openai/gpt-4o-mini-transcribe
+    languages:
+        - en
+    default_language: ""
+    timeout: 60
+    debug: false
+
+schema:
+    api_key: password
+    models:
+        - str
+    languages:
+        - str
+    default_language: str?
+    timeout: int(1,300)
+    debug: bool
+
+# Panel
+panel_icon: mdi:microphone-message
+panel_title: OpenRouter STT
+
+# Documentation
+# Supervisor pulls ghcr.io/snabb/wyoming_openrouter:<version> (the version
+# above) instead of building locally. IMPORTANT: every version bump here must
+# have a matching ghcr.io/snabb/wyoming_openrouter:<version> tag already
+# published (CI does this automatically on push, see job-docker.yml), or
+# Supervisor's update check will fail to find the image.
+image: ghcr.io/snabb/wyoming_openrouter

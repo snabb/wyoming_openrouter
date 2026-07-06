@@ -1,0 +1,41 @@
+---
+# Home Assistant app option names/descriptions shown in the Configuration tab.
+# https://developers.home-assistant.io/docs/add-ons/configuration#translating-add-on-options
+configuration:
+    api_key:
+        name: OpenRouter API key
+        description: >-
+            Your OpenRouter API key (https://openrouter.ai/keys). Every
+            transcription request is billed against your own OpenRouter
+            account.
+    models:
+        name: Models
+        description: >-
+            Comma-separated OpenRouter STT model slugs to advertise, e.g.
+            openai/gpt-4o-mini-transcribe or
+            openai/gpt-4o-mini-transcribe,openai/whisper-1. The first is the
+            default model used for every request from Home Assistant (Home
+            Assistant never picks between multiple models itself). Check this
+            app's log tab after startup for the current live OpenRouter STT
+            model catalog and prices before choosing.
+    languages:
+        name: Languages
+        description: >-
+            Languages to advertise to Home Assistant's UI. OpenRouter STT
+            models are generally multilingual and this list isn't enforced by
+            the server itself, just used to populate Home Assistant's
+            language selector.
+    default_language:
+        name: Default language hint
+        description: >-
+            Optional ISO-639-1 language hint (e.g. en) sent to OpenRouter only
+            when a request doesn't specify one. Leave empty to let the model
+            auto-detect the spoken language.
+    timeout:
+        name: Request timeout (seconds)
+        description: HTTP timeout for OpenRouter transcription requests.
+    debug:
+        name: Debug logging
+        description: Show verbose logs for troubleshooting.
+network:
+    10300/tcp: Wyoming protocol

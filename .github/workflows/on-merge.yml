@@ -1,0 +1,20 @@
+---
+name: On Merge
+
+on:
+    push:
+        branches: [master]
+
+jobs:
+    test:
+        uses: ./.github/workflows/job-test.yml
+        permissions:
+            contents: read
+            id-token: write
+
+    docker:
+        needs: test
+        uses: ./.github/workflows/job-docker.yml
+        permissions:
+            contents: read
+            packages: write
