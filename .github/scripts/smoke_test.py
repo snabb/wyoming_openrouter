@@ -27,8 +27,11 @@ async def main() -> None:
         print("FAIL: did not receive an Info event in response to Describe", file=sys.stderr)
         sys.exit(1)
 
+    # Matches job-docker.yml's smoke-test task, named "smoke-test" -- the
+    # program name is "OpenRouter (<task name>)", not a fixed string, so each
+    # configured task is distinguishable in Home Assistant.
     info = Info.from_event(event)
-    if not info.asr or info.asr[0].name != "openrouter":
+    if not info.asr or info.asr[0].name != "OpenRouter (smoke-test)":
         print(f"FAIL: unexpected asr programs: {info.asr}", file=sys.stderr)
         sys.exit(1)
 

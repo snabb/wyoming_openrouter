@@ -37,7 +37,12 @@ def get_tts_wyoming_info(task: TaskConfig) -> Info:
     return Info(
         tts=[
             TtsProgram(
-                name="openrouter",
+                # HA's wyoming integration uses this as both the entity's
+                # display name (WyomingTtsProvider._attr_name) and the
+                # config-entry title when added manually (WyomingService.
+                # get_name()) -- must include the task name, or every task
+                # looks identical ("openrouter") in HA.
+                name=f"OpenRouter ({task.name})",
                 attribution=_ATTRIBUTION,
                 installed=True,
                 description=f"OpenRouter text-to-speech: {task.name}",
