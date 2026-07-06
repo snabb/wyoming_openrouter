@@ -47,10 +47,10 @@ This app pushes four sensor entities to Home Assistant after every
 transcription request, using Home Assistant's own Core API (via the
 Supervisor proxy, not MQTT):
 
-- `sensor.wyoming_openrouter_request_count`
-- `sensor.wyoming_openrouter_total_cost` (USD)
-- `sensor.wyoming_openrouter_last_latency_ms`
-- `sensor.wyoming_openrouter_avg_latency_ms`
+- `sensor.wyoming_openrouter_stt_request_count`
+- `sensor.wyoming_openrouter_stt_total_cost` (USD)
+- `sensor.wyoming_openrouter_stt_last_latency_ms`
+- `sensor.wyoming_openrouter_stt_avg_latency_ms`
 
 ## Troubleshooting
 

@@ -53,10 +53,10 @@ def test_push_to_supervisor_posts_expected_urls_with_token(monkeypatch):
     assert mock_post.call_count == 4
     urls = {call.args[0] for call in mock_post.call_args_list}
     assert urls == {
-        "http://supervisor/core/api/states/sensor.wyoming_openrouter_request_count",
-        "http://supervisor/core/api/states/sensor.wyoming_openrouter_total_cost",
-        "http://supervisor/core/api/states/sensor.wyoming_openrouter_last_latency_ms",
-        "http://supervisor/core/api/states/sensor.wyoming_openrouter_avg_latency_ms",
+        "http://supervisor/core/api/states/sensor.wyoming_openrouter_stt_request_count",
+        "http://supervisor/core/api/states/sensor.wyoming_openrouter_stt_total_cost",
+        "http://supervisor/core/api/states/sensor.wyoming_openrouter_stt_last_latency_ms",
+        "http://supervisor/core/api/states/sensor.wyoming_openrouter_stt_avg_latency_ms",
     }
     for call in mock_post.call_args_list:
         assert call.kwargs["headers"]["Authorization"] == "Bearer test-token"

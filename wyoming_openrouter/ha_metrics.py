@@ -55,14 +55,14 @@ class Metrics:
 
 def _sensor_states(metrics: Metrics) -> dict[str, dict[str, Any]]:
     return {
-        "sensor.wyoming_openrouter_request_count": {
+        "sensor.wyoming_openrouter_stt_request_count": {
             "state": metrics.request_count,
             "attributes": {
                 "friendly_name": "Wyoming OpenRouter request count",
                 "icon": "mdi:counter",
             },
         },
-        "sensor.wyoming_openrouter_total_cost": {
+        "sensor.wyoming_openrouter_stt_total_cost": {
             "state": round(metrics.total_cost, 6),
             "attributes": {
                 "friendly_name": "Wyoming OpenRouter total cost",
@@ -70,7 +70,7 @@ def _sensor_states(metrics: Metrics) -> dict[str, dict[str, Any]]:
                 "icon": "mdi:currency-usd",
             },
         },
-        "sensor.wyoming_openrouter_last_latency_ms": {
+        "sensor.wyoming_openrouter_stt_last_latency_ms": {
             "state": metrics.last_latency_ms,
             "attributes": {
                 "friendly_name": "Wyoming OpenRouter last request latency",
@@ -78,7 +78,7 @@ def _sensor_states(metrics: Metrics) -> dict[str, dict[str, Any]]:
                 "icon": "mdi:timer-outline",
             },
         },
-        "sensor.wyoming_openrouter_avg_latency_ms": {
+        "sensor.wyoming_openrouter_stt_avg_latency_ms": {
             "state": round(metrics.avg_latency_ms, 1),
             "attributes": {
                 "friendly_name": "Wyoming OpenRouter average request latency",
