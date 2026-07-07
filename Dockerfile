@@ -62,7 +62,13 @@ RUN chmod +x /run.sh /healthcheck.sh
 # as of writing) with a little headroom.
 EXPOSE 10300-10319
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# start-period covers the worst case before any port binds: the two
+# catalog-fetch calls in __main__.py run concurrently (not sequentially),
+# so their generous 20s-each timeout only adds up to ~20s worst case, not
+# ~40s -- confirmed live that actual startup (catalog fetch + all 20 ports
+# binding) normally takes well under 2s. interval/retries stay short since
+# there's nothing slow about probing already-running ports.
+HEALTHCHECK --interval=5s --timeout=10s --start-period=30s --retries=3 \
     CMD /healthcheck.sh
 
 CMD ["/run.sh"]

@@ -60,48 +60,60 @@ async def main() -> None:
     # not be skipped just because the config isn't valid (or isn't filled in)
     # yet. Best-effort only, so a fetch failure never blocks startup. No auth
     # needed -- OpenRouter's /models listing is public.
-    try:
-        stt_catalog = await asyncio.to_thread(list_stt_models)
-        stt_line = ", ".join(
-            f"{m['id']} ({describe_stt_price(m)})" for m in stt_catalog
-        )
-        _LOGGER.info(
-            "Live OpenRouter STT model catalog (a model's real per-request "
-            "cost always comes from its response, not this catalog; "
-            "duration-unit prices are per-second for some models and "
-            "per-minute for others, with no reliable way to tell which from "
-            "here -- see the model's OpenRouter page): %s",
-            stt_line or "<none returned>",
-        )
-    except Exception as exc:
-        # A network hiccup (e.g. a slow/timed-out response from OpenRouter's
-        # public /models endpoint) is expected often enough that a full
-        # traceback here would look like a real failure when it isn't --
-        # startup continues regardless. Keep the traceback only for anything
-        # other than a plain request failure, since that's actually unexpected.
-        _LOGGER.warning(
-            "Could not fetch the live OpenRouter STT model catalog: %s "
-            "(startup continues regardless)",
-            exc,
-            exc_info=not isinstance(exc, requests.exceptions.RequestException),
-        )
+    #
+    # Fetched concurrently, not sequentially: each is a separate blocking
+    # HTTP call with its own (generous) timeout, and running them one after
+    # another would double the worst-case delay before any task's port
+    # binds -- directly extending the container's healthcheck start-period
+    # for no benefit, since the two catalogs don't depend on each other.
+    async def _log_stt_catalog() -> None:
+        try:
+            stt_catalog = await asyncio.to_thread(list_stt_models)
+            stt_line = ", ".join(
+                f"{m['id']} ({describe_stt_price(m)})" for m in stt_catalog
+            )
+            _LOGGER.info(
+                "Live OpenRouter STT model catalog (a model's real per-request "
+                "cost always comes from its response, not this catalog; "
+                "duration-unit prices are per-second for some models and "
+                "per-minute for others, with no reliable way to tell which "
+                "from here -- see the model's OpenRouter page): %s",
+                stt_line or "<none returned>",
+            )
+        except Exception as exc:
+            # A network hiccup (e.g. a slow/timed-out response from
+            # OpenRouter's public /models endpoint) is expected often enough
+            # that a full traceback here would look like a real failure when
+            # it isn't -- startup continues regardless. Keep the traceback
+            # only for anything other than a plain request failure, since
+            # that's actually unexpected.
+            _LOGGER.warning(
+                "Could not fetch the live OpenRouter STT model catalog: %s "
+                "(startup continues regardless)",
+                exc,
+                exc_info=not isinstance(exc, requests.exceptions.RequestException),
+            )
 
-    tts_catalog: list = []
-    try:
-        tts_catalog = await asyncio.to_thread(list_tts_models)
-        tts_line = ", ".join(
-            f"{m['id']} ({describe_tts_price(m)})" for m in tts_catalog
-        )
-        _LOGGER.info(
-            "Live OpenRouter TTS model catalog: %s", tts_line or "<none returned>"
-        )
-    except Exception as exc:
-        _LOGGER.warning(
-            "Could not fetch the live OpenRouter TTS model catalog: %s "
-            "(startup continues regardless)",
-            exc,
-            exc_info=not isinstance(exc, requests.exceptions.RequestException),
-        )
+    async def _fetch_tts_catalog() -> list:
+        try:
+            tts_catalog = await asyncio.to_thread(list_tts_models)
+            tts_line = ", ".join(
+                f"{m['id']} ({describe_tts_price(m)})" for m in tts_catalog
+            )
+            _LOGGER.info(
+                "Live OpenRouter TTS model catalog: %s", tts_line or "<none returned>"
+            )
+            return tts_catalog
+        except Exception as exc:
+            _LOGGER.warning(
+                "Could not fetch the live OpenRouter TTS model catalog: %s "
+                "(startup continues regardless)",
+                exc,
+                exc_info=not isinstance(exc, requests.exceptions.RequestException),
+            )
+            return []
+
+    _, tts_catalog = await asyncio.gather(_log_stt_catalog(), _fetch_tts_catalog())
     tts_pricing = build_price_per_char_table(tts_catalog)
 
     try:
