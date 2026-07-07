@@ -42,8 +42,8 @@ wait_until_idle() {
 
 count=0
 for entity in $entities; do
-    name=${entity#tts.openrouter_}
-    message="This is a test of the $name voice."
+    name=$(echo "${entity#tts.openrouter_}" | tr '_' ' ')
+    message="$name. This is a test announcement."
     echo "Announcing via $entity: \"$message\""
     curl -sS -X POST -H "Authorization: Bearer $HASS_TOKEN" \
         -H "Content-Type: application/json" \
