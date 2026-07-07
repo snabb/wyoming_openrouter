@@ -8,6 +8,7 @@ import sys
 from functools import partial
 from typing import cast
 
+import requests
 from wyoming.server import AsyncTcpServer
 
 from . import __version__
@@ -72,11 +73,17 @@ async def main() -> None:
             "here -- see the model's OpenRouter page): %s",
             stt_line or "<none returned>",
         )
-    except Exception:
+    except Exception as exc:
+        # A network hiccup (e.g. a slow/timed-out response from OpenRouter's
+        # public /models endpoint) is expected often enough that a full
+        # traceback here would look like a real failure when it isn't --
+        # startup continues regardless. Keep the traceback only for anything
+        # other than a plain request failure, since that's actually unexpected.
         _LOGGER.warning(
-            "Could not fetch the live OpenRouter STT model catalog "
+            "Could not fetch the live OpenRouter STT model catalog: %s "
             "(startup continues regardless)",
-            exc_info=True,
+            exc,
+            exc_info=not isinstance(exc, requests.exceptions.RequestException),
         )
 
     tts_catalog: list = []
@@ -88,11 +95,12 @@ async def main() -> None:
         _LOGGER.info(
             "Live OpenRouter TTS model catalog: %s", tts_line or "<none returned>"
         )
-    except Exception:
+    except Exception as exc:
         _LOGGER.warning(
-            "Could not fetch the live OpenRouter TTS model catalog "
+            "Could not fetch the live OpenRouter TTS model catalog: %s "
             "(startup continues regardless)",
-            exc_info=True,
+            exc,
+            exc_info=not isinstance(exc, requests.exceptions.RequestException),
         )
     tts_pricing = build_price_per_char_table(tts_catalog)
 

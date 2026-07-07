@@ -141,7 +141,7 @@ def transcribe(
 
 
 def list_stt_models(
-    api_key: Optional[str] = None, timeout: float = 10.0
+    api_key: Optional[str] = None, timeout: float = 20.0
 ) -> list[dict[str, Any]]:
     """Best-effort fetch of the live OpenRouter STT model catalog for the startup log.
 
@@ -160,7 +160,7 @@ def list_stt_models(
 
 
 def list_tts_models(
-    api_key: Optional[str] = None, timeout: float = 10.0
+    api_key: Optional[str] = None, timeout: float = 20.0
 ) -> list[dict[str, Any]]:
     """Best-effort fetch of the live OpenRouter TTS model catalog for the startup log."""
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
