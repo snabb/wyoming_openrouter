@@ -124,7 +124,7 @@ value):
 | `language` | stt, tts | Required for stt; advertised to Home Assistant as this task's supported language (e.g. `en`) -- an Assist pipeline can only select this task if its language matches. Optional for tts (defaults to `en`) -- set it if the task's `voice` speaks a different language, or Home Assistant will misadvertise it |
 | `default_language` | stt | Hint sent to OpenRouter only when a request doesn't specify one; empty lets the model auto-detect |
 | `temperature` | stt | `0`-`1`, sampling parameter |
-| `voice` | tts | Required; valid values are model-specific -- see the startup log |
+| `voice` | tts | Required; valid values are model-specific -- see the startup log. To offer several voices for the same model, configure one task per voice (each gets its own port/HA entity) |
 | `speed` | tts | Playback speed multiplier (default `1.0`) |
 | `audio_format` | tts | `pcm` (default, no local decode) or `mp3` (smaller transfer, decoded locally via `mpg123`; needed for models that don't support pcm) |
 
@@ -135,6 +135,30 @@ No cap on the number of tasks; the Home Assistant App/Docker image reserve
 curl -s 'https://openrouter.ai/api/v1/models?output_modalities=transcription' | jq '.data[] | {id, pricing}'
 curl -s 'https://openrouter.ai/api/v1/models?output_modalities=speech' | jq '.data[] | {id, pricing, supported_voices}'
 ```
+
+### Provider passthrough example
+
+OpenAI's TTS models support an `instructions` parameter (accent, emotion,
+pacing, tone, etc.), but on OpenRouter this isn't a top-level field -- it's
+nested under `provider.options.openai.instructions`. The generic `provider`
+field above already forwards arbitrary JSON verbatim, so this works today
+with no code changes:
+
+```jsonc
+{
+  "name": "assist-tts",
+  "api_key": "sk-or-v1-...",
+  "type": "tts",
+  "port": 10301,
+  "model": "openai/gpt-4o-mini-tts",
+  "voice": "alloy",
+  "provider": "{\"options\":{\"openai\":{\"instructions\":\"Speak in a warm, cheerful tone.\"}}}"
+}
+```
+
+This is specific to whichever vendor OpenRouter actually routes the model
+to (`options.openai` here) -- unrelated to the top-level `voice`/`speed`
+fields, and not guaranteed to exist for every provider/model.
 
 ## Metrics in Home Assistant
 
@@ -174,6 +198,10 @@ instead of input characters).
 - Metrics sensor entities are plain Home Assistant states pushed via the
   Core API, not full registry-managed entities tied to a device/config
   entry.
+- OpenRouter's transcription endpoint accepts an OpenAI-style `prompt`
+  field (for vocabulary/context hints) but documents it as silently
+  ignored -- there's currently no way to bias STT transcription with
+  context text through OpenRouter.
 
 ## Development
 
