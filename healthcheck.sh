@@ -7,11 +7,17 @@
 # fail-fast -- if any single task's port failed to bind, the whole process
 # would have crashed already and wouldn't be running at all. So the process
 # being alive and answering on any one port already proves every other
-# port is bound and the event loop is responsive too; probing all of them
-# only adds time for no extra guarantee (confirmed live: a sequential
-# all-ports version blew past the HEALTHCHECK's own --timeout with enough
-# tasks configured and permanently marked a perfectly working container
-# "unhealthy").
+# port is bound and the event loop is responsive too.
+#
+# Uses wyoming_openrouter.probe rather than `nc`: `nc -w N` doesn't exit as
+# soon as it receives the expected response, only when the connection
+# closes or its own idle timeout elapses -- and Wyoming connections are
+# intentionally kept open by the server, so every `nc` probe paid the full
+# idle timeout as a fixed floor regardless of how fast the real answer
+# arrived. Confirmed live via `docker inspect`: with enough tasks, a
+# sequential all-ports `nc`-based version blew past this HEALTHCHECK's own
+# --timeout and permanently marked a perfectly working container
+# "unhealthy".
 set -e
 
 CONFIG_PATH=/data/options.json
@@ -30,9 +36,4 @@ if [ -z "$port" ] || [ "$port" = "null" ]; then
     exit 1
 fi
 
-if ! echo '{"type":"describe"}' | nc -w 2 localhost "$port" 2>/dev/null | grep -q "openrouter"; then
-    echo "healthcheck: task on port $port did not respond" >&2
-    exit 1
-fi
-
-exit 0
+exec python3 -m wyoming_openrouter.probe "$port"

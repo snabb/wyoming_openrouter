@@ -44,7 +44,7 @@ discover_one_task() {
     max_wait=60
     waited=0
     while [ "$waited" -lt "$max_wait" ]; do
-        if echo '{"type":"describe"}' | nc -w 2 localhost "$port" 2>/dev/null | grep -q "openrouter"; then
+        if python3 -m wyoming_openrouter.probe "$port" 2>/dev/null; then
             break
         fi
         sleep 2
