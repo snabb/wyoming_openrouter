@@ -2,10 +2,12 @@
 # Home Assistant app option names/descriptions shown in the Configuration tab.
 # https://developers.home-assistant.io/docs/add-ons/configuration#translating-add-on-options
 #
-# `tasks` is a nested list of objects (name/api_key/type/port/model/...) --
+# `tasks` is a nested list of objects (name/api_key/type/port/model/...).
 # Supervisor's per-field translation for nested list items isn't
-# well-documented, so this single description covers the whole structure
-# rather than assuming each nested field gets its own tooltip.
+# well-documented -- the dev docs only show `fields:` for a flat (non-list)
+# nested object -- so this is an experiment: `fields:` below may or may not
+# be honored for a list-of-objects option in the actual Configuration tab UI.
+# The top-level `tasks` description is kept as a fallback summary either way.
 configuration:
     debug:
         name: Debug logging
@@ -14,26 +16,68 @@ configuration:
         name: Tasks
         description: >-
             One or more independent speech tasks, each its own OpenRouter
-            model and its own Wyoming port (10300-10319) -- add one "Wyoming
-            Protocol" integration entry per task in Home Assistant.
-            Fields: name (any label, used in logs and Home Assistant sensor
-            entity IDs); api_key (your OpenRouter API key -- reuse the same
-            key across tasks by repeating it, or use different keys per
-            task); type (stt or tts); port (10300-10319, must be unique);
-            model (any OpenRouter model slug -- check this app's log tab
-            after startup for the live STT/TTS model catalog and current
-            prices); timeout (HTTP timeout in seconds). STT-only: language
-            (advertised to Home Assistant's UI), default_language (hint sent
-            to OpenRouter only when a request doesn't specify one; leave
-            empty to auto-detect), temperature (0-1, sampling parameter).
-            TTS-only: voice (required -- valid values are model-specific,
-            see the model catalog), speed (playback speed multiplier),
-            audio_format (pcm or mp3 -- pcm needs no local decoding but not
-            every model supports it; mp3 is smaller to transfer but is
-            decoded locally via mpg123 before Wyoming delivery, which always
-            needs raw PCM regardless of this setting). Advanced: provider
-            (raw JSON string, passed through as OpenRouter's "provider"
-            field, e.g. for provider routing or Azure TTS style options).
+            model and its own Wyoming port -- add one "Wyoming Protocol"
+            integration entry per task in Home Assistant.
+        fields:
+            name:
+                name: Name
+                description: Any label; used in logs and Home Assistant sensor entity IDs.
+            api_key:
+                name: API key
+                description: >-
+                    Your OpenRouter API key. Reuse the same key across tasks
+                    by repeating it, or use different keys per task.
+            type:
+                name: Type
+                description: >-
+                    stt = Speech-to-text (STT); tts = Text-to-speech (TTS).
+            port:
+                name: Port
+                description: >-
+                    Must be unique and between 10300-10319 (this app's
+                    reserved port range) -- Home Assistant Core connects to
+                    each task's Wyoming server on this port.
+            model:
+                name: Model
+                description: >-
+                    Any OpenRouter model slug. Check this app's log tab after
+                    startup for the live STT/TTS model catalog and current
+                    prices.
+            timeout:
+                name: Timeout
+                description: HTTP request timeout in seconds.
+            language:
+                name: Language (STT)
+                description: Advertised to Home Assistant's UI. STT tasks only.
+            default_language:
+                name: Default language (STT)
+                description: >-
+                    Hint sent to OpenRouter only when a request doesn't
+                    specify one; leave empty to auto-detect. STT tasks only.
+            temperature:
+                name: Temperature (STT)
+                description: 0-1 sampling parameter. STT tasks only.
+            voice:
+                name: Voice (TTS)
+                description: >-
+                    Required for TTS tasks. Valid values are model-specific --
+                    see the model catalog.
+            speed:
+                name: Speed (TTS)
+                description: Playback speed multiplier. TTS tasks only.
+            audio_format:
+                name: Audio format (TTS)
+                description: >-
+                    pcm needs no local decoding but not every model supports
+                    it; mp3 is smaller to transfer but is decoded locally via
+                    mpg123 before Wyoming delivery, which always needs raw PCM
+                    regardless of this setting. TTS tasks only.
+            provider:
+                name: Provider (advanced)
+                description: >-
+                    Raw JSON string, passed through as OpenRouter's
+                    "provider" field, e.g. for provider routing or Azure TTS
+                    style options.
 network:
     10300/tcp: Task port (if configured)
     10301/tcp: Task port (if configured)
