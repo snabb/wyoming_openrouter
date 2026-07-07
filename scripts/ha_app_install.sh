@@ -39,19 +39,31 @@ echo "Installing '$APP_NAME' (slug: $slug)..."
 hass-cli -o json raw ws supervisor/api \
     --json "{\"endpoint\":\"/store/addons/$slug/install\",\"method\":\"post\",\"timeout\":null}"
 
-echo "Waiting for the app to start (boot: auto should start it automatically after install)..."
+echo "Waiting for the app to report a settled state..."
 state=""
 for _ in $(seq 1 30); do
     state=$(hass-cli -o json raw ws supervisor/api \
         --json "{\"endpoint\":\"/addons/$slug/info\",\"method\":\"get\"}" \
         | jq -r '.result.state')
-    if [ "$state" = "started" ]; then
-        echo "Installed and running (slug: $slug)."
-        exit 0
-    fi
+    case "$state" in
+        started)
+            echo "Installed and running (slug: $slug)."
+            exit 0
+            ;;
+        stopped)
+            # Expected: a fresh install's default options are just
+            # config.yaml's placeholder task (an empty api_key), which
+            # fails config validation and exits immediately -- not a
+            # failed install. Run ha_app_configure_all_models.sh next.
+            echo "Installed (slug: $slug). It exited right away because it" \
+                "still has the placeholder default config -- that's" \
+                "expected. Run ha_app_configure_all_models.sh next."
+            exit 0
+            ;;
+    esac
     sleep 2
 done
 
-echo "WARNING: app did not reach 'started' state within 60s (last state: $state)." \
+echo "WARNING: app did not reach a settled state within 60s (last state: $state)." \
     "Check the app's Log tab." >&2
 exit 1
