@@ -30,6 +30,53 @@ echo "========================================"
 # pre-fills host:port when the user adds each "Wyoming Protocol" integration
 # entry in Home Assistant -- it does not add the entry itself; each task is
 # still added individually, same as before, just with less manual typing.
+#
+# Each task is handled in its own backgrounded subshell (discover_one_task,
+# launched in parallel below) rather than one task at a time -- with a
+# larger task count (up to 20), a sequential loop's per-task wait+retry
+# delays (each observed ~2s even in the successful case) stack up linearly
+# for no real reason, since every task's port is independent.
+discover_one_task() {
+    name="$1"
+    port="$2"
+    discovery_host="$3"
+
+    max_wait=60
+    waited=0
+    while [ "$waited" -lt "$max_wait" ]; do
+        if echo '{"type":"describe"}' | nc -w 2 localhost "$port" 2>/dev/null | grep -q "openrouter"; then
+            break
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    if [ "$waited" -ge "$max_wait" ]; then
+        echo "Warning: timed out waiting for task '$name' on port $port to start"
+        return 0
+    fi
+
+    retry=0
+    max_retries=3
+    sent=false
+    while [ "$retry" -lt "$max_retries" ]; do
+        response=$(curl -s -X POST \
+            -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"service\": \"wyoming\", \"config\": {\"uri\": \"tcp://${discovery_host}:${port}\"}}" \
+            "http://supervisor/discovery" 2>&1)
+        if echo "$response" | grep -q '"result".*"ok"'; then
+            echo "Sent discovery for task '$name' (${discovery_host}:${port})"
+            sent=true
+            break
+        fi
+        retry=$((retry + 1))
+        sleep 2
+    done
+    if [ "$sent" != "true" ]; then
+        echo "Warning: failed to send discovery for task '$name' after ${max_retries} attempts"
+    fi
+}
+
 send_discovery() {
     if [ -z "$SUPERVISOR_TOKEN" ]; then
         echo "Not running in Home Assistant (no SUPERVISOR_TOKEN) - skipping discovery"
@@ -54,42 +101,18 @@ send_discovery() {
         discovery_host="$hostname_value"
     fi
 
-    jq -r '.tasks[] | "\(.name) \(.port)"' "$CONFIG_PATH" | while read -r name port; do
-        max_wait=60
-        waited=0
-        while [ "$waited" -lt "$max_wait" ]; do
-            if echo '{"type":"describe"}' | nc -w 2 localhost "$port" 2>/dev/null | grep -q "openrouter"; then
-                break
-            fi
-            sleep 2
-            waited=$((waited + 2))
-        done
-        if [ "$waited" -ge "$max_wait" ]; then
-            echo "Warning: timed out waiting for task '$name' on port $port to start"
-            continue
-        fi
+    # Read from a temp file, not a pipe: in POSIX sh, a `while read` fed by a
+    # pipe runs in a subshell, so background jobs started inside it would be
+    # children of that (already-exited) subshell rather than of this
+    # function -- the `wait` below wouldn't actually wait for them.
+    task_list=$(mktemp)
+    jq -r '.tasks[] | "\(.name) \(.port)"' "$CONFIG_PATH" > "$task_list"
 
-        retry=0
-        max_retries=3
-        sent=false
-        while [ "$retry" -lt "$max_retries" ]; do
-            response=$(curl -s -X POST \
-                -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-                -H "Content-Type: application/json" \
-                -d "{\"service\": \"wyoming\", \"config\": {\"uri\": \"tcp://${discovery_host}:${port}\"}}" \
-                "http://supervisor/discovery" 2>&1)
-            if echo "$response" | grep -q '"result".*"ok"'; then
-                echo "Sent discovery for task '$name' (${discovery_host}:${port})"
-                sent=true
-                break
-            fi
-            retry=$((retry + 1))
-            sleep 2
-        done
-        if [ "$sent" != "true" ]; then
-            echo "Warning: failed to send discovery for task '$name' after ${max_retries} attempts"
-        fi
-    done
+    while read -r name port; do
+        discover_one_task "$name" "$port" "$discovery_host" &
+    done < "$task_list"
+    wait
+    rm -f "$task_list"
 }
 
 send_discovery &
