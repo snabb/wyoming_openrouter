@@ -322,23 +322,27 @@ def describe_stt_price(model: dict[str, Any]) -> str:
     """Format an STT catalog entry's price for a human-readable log line.
 
     Unlike TTS, STT models have no single common billing unit: confirmed
-    live, models with an identical-looking pricing.prompt value are billed
-    per second, per minute, or per token depending on the model, and the
-    catalog gives no field to tell which -- only some model descriptions say
-    so explicitly (e.g. "priced per token"). A nonzero pricing.completion is
-    the one reliable signal available (seen on both OpenAI transcribe
-    models, which do state "per token" in their description), so those are
-    labeled precisely; everything else is labeled as duration-priced without
-    guessing whether that's per second or per minute. This is display-only:
-    the real cost always comes from the transcription response's
-    usage.cost, never computed locally.
+    live (comparing real usage.cost from actual requests against this same
+    pricing.prompt field), models with an identical-looking pricing.prompt
+    value are billed per second, per minute, or per token depending on the
+    model -- and neither the catalog nor the official OpenRouter SDK's own
+    schema (which documents this field as "per token" unconditionally, for
+    every modality) discloses which. A nonzero pricing.completion is the one
+    reliable signal available (seen on both OpenAI transcribe models, which
+    do state "per token" in their description), so those are labeled
+    precisely; everything else is labeled as duration-priced without
+    guessing whether that's per second or per minute -- the caller is
+    expected to state that caveat once for the whole catalog rather than
+    repeating it per model (see __main__.py's catalog log line). This is
+    display-only: the real cost always comes from the transcription
+    response's usage.cost, never computed locally.
     """
     pricing = model.get("pricing") or {}
     prompt = pricing.get("prompt", "?")
     completion = pricing.get("completion", "?")
     if _priced_per_token(pricing):
         return f"${prompt}/input-token, ${completion}/output-token"
-    return f"${prompt}/sec-or-min of audio (unit varies by model; see model page)"
+    return f"${prompt}/duration-unit"
 
 
 def get_generation_cost(

@@ -373,10 +373,7 @@ def test_describe_stt_price_labels_duration_priced_model():
         "id": "openai/whisper-1",
         "pricing": {"prompt": "0.006", "completion": "0"},
     }
-    assert (
-        describe_stt_price(model)
-        == "$0.006/sec-or-min of audio (unit varies by model; see model page)"
-    )
+    assert describe_stt_price(model) == "$0.006/duration-unit"
 
 
 def test_describe_stt_price_labels_per_token_model():

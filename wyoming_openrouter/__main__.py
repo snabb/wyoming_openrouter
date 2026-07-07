@@ -65,7 +65,12 @@ async def main() -> None:
             f"{m['id']} ({describe_stt_price(m)})" for m in stt_catalog
         )
         _LOGGER.info(
-            "Live OpenRouter STT model catalog: %s", stt_line or "<none returned>"
+            "Live OpenRouter STT model catalog (a model's real per-request "
+            "cost always comes from its response, not this catalog; "
+            "duration-unit prices are per-second for some models and "
+            "per-minute for others, with no reliable way to tell which from "
+            "here -- see the model's OpenRouter page): %s",
+            stt_line or "<none returned>",
         )
     except Exception:
         _LOGGER.warning(
