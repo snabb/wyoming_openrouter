@@ -11,6 +11,8 @@ from wyoming_openrouter.openrouter import (
     SpeechMeta,
     TranscriptionResult,
     build_price_per_char_table,
+    describe_stt_price,
+    describe_tts_price,
     get_generation_cost,
     list_stt_models,
     list_tts_models,
@@ -24,14 +26,18 @@ def _fake_response(status_code=200, json_data=None):
     response.status_code = status_code
     response.json.return_value = json_data or {}
     if status_code >= 400:
-        response.raise_for_status.side_effect = requests.HTTPError(f"{status_code} error")
+        response.raise_for_status.side_effect = requests.HTTPError(
+            f"{status_code} error"
+        )
     else:
         response.raise_for_status.return_value = None
     return response
 
 
 def test_transcribe_sends_expected_request_shape():
-    response = _fake_response(json_data={"text": "hello world", "usage": {"cost": 0.0001}})
+    response = _fake_response(
+        json_data={"text": "hello world", "usage": {"cost": 0.0001}}
+    )
     with patch(
         "wyoming_openrouter.openrouter.requests.post", return_value=response
     ) as mock_post:
@@ -165,14 +171,19 @@ def test_list_tts_models_returns_data_list():
 
 
 def _fake_stream_response(
-    status_code=200, content_type="audio/pcm;rate=24000;channels=1", chunks=None, generation_id="gen-1"
+    status_code=200,
+    content_type="audio/pcm;rate=24000;channels=1",
+    chunks=None,
+    generation_id="gen-1",
 ):
     response = MagicMock(spec=requests.Response)
     response.status_code = status_code
     response.headers = {"Content-Type": content_type, "X-Generation-Id": generation_id}
     response.iter_content.return_value = iter(chunks or [b"\x00\x01", b"\x02\x03"])
     if status_code >= 400:
-        response.raise_for_status.side_effect = requests.HTTPError(f"{status_code} error")
+        response.raise_for_status.side_effect = requests.HTTPError(
+            f"{status_code} error"
+        )
     else:
         response.raise_for_status.return_value = None
     return response
@@ -212,7 +223,10 @@ def test_synthesize_stream_requests_mp3_when_given():
         "wyoming_openrouter.openrouter.requests.post", return_value=response
     ) as mock_post:
         meta, chunks = synthesize_stream(
-            "sk-test", "mistralai/voxtral-mini-tts-2603", "hello", "en_paul_neutral",
+            "sk-test",
+            "mistralai/voxtral-mini-tts-2603",
+            "hello",
+            "en_paul_neutral",
             response_format="mp3",
         )
         list(chunks)
@@ -274,9 +288,7 @@ def test_synthesize_stream_retries_once_on_retryable_status_then_succeeds():
 
 def test_synthesize_stream_nonretryable_error_raises_and_closes_response():
     bad_request = _fake_stream_response(status_code=400)
-    with patch(
-        "wyoming_openrouter.openrouter.requests.post", return_value=bad_request
-    ):
+    with patch("wyoming_openrouter.openrouter.requests.post", return_value=bad_request):
         with pytest.raises(OpenRouterError):
             synthesize_stream("sk-test", "m", "hi", "alloy")
 
@@ -304,7 +316,8 @@ def test_get_generation_cost_returns_none_when_not_yet_propagated():
 
 def test_get_generation_cost_returns_none_on_network_failure_never_raises():
     with patch(
-        "wyoming_openrouter.openrouter.requests.get", side_effect=requests.ConnectionError()
+        "wyoming_openrouter.openrouter.requests.get",
+        side_effect=requests.ConnectionError(),
     ):
         cost = get_generation_cost("sk-test", "gen-1")
 
@@ -316,8 +329,14 @@ def test_get_generation_cost_returns_none_on_network_failure_never_raises():
 
 def test_build_price_per_char_table_includes_zero_completion_models():
     catalog = [
-        {"id": "hexgrad/kokoro-82m", "pricing": {"prompt": "0.00000062", "completion": "0"}},
-        {"id": "mistralai/voxtral-mini-tts-2603", "pricing": {"prompt": "0.000016", "completion": 0}},
+        {
+            "id": "hexgrad/kokoro-82m",
+            "pricing": {"prompt": "0.00000062", "completion": "0"},
+        },
+        {
+            "id": "mistralai/voxtral-mini-tts-2603",
+            "pricing": {"prompt": "0.000016", "completion": 0},
+        },
     ]
     table = build_price_per_char_table(catalog)
     assert table == {
@@ -344,3 +363,46 @@ def test_build_price_per_char_table_skips_malformed_entries():
     ]
     table = build_price_per_char_table(catalog)
     assert table == {}
+
+
+# --- describe_stt_price / describe_tts_price --------------------------------------
+
+
+def test_describe_stt_price_labels_duration_priced_model():
+    model = {
+        "id": "openai/whisper-1",
+        "pricing": {"prompt": "0.006", "completion": "0"},
+    }
+    assert (
+        describe_stt_price(model)
+        == "$0.006/sec-or-min of audio (unit varies by model; see model page)"
+    )
+
+
+def test_describe_stt_price_labels_per_token_model():
+    model = {
+        "id": "openai/gpt-4o-mini-transcribe",
+        "pricing": {"prompt": "0.00000125", "completion": "0.000005"},
+    }
+    assert (
+        describe_stt_price(model) == "$0.00000125/input-token, $0.000005/output-token"
+    )
+
+
+def test_describe_tts_price_labels_ordinary_model_per_char():
+    model = {
+        "id": "hexgrad/kokoro-82m",
+        "pricing": {"prompt": "0.00000062", "completion": "0"},
+    }
+    assert describe_tts_price(model) == "$0.00000062/char"
+
+
+def test_describe_tts_price_flags_nonzero_completion_outlier():
+    model = {
+        "id": "google/gemini-3.1-flash-tts-preview",
+        "pricing": {"prompt": "0.000001", "completion": "0.00002"},
+    }
+    assert (
+        describe_tts_price(model)
+        == "$0.000001/char (approx -- priced per output audio token, not input character)"
+    )

@@ -13,7 +13,13 @@ from wyoming.server import AsyncTcpServer
 from . import __version__
 from .config import ConfigError, load_config
 from .ha_metrics import Metrics
-from .openrouter import build_price_per_char_table, list_stt_models, list_tts_models
+from .openrouter import (
+    build_price_per_char_table,
+    describe_stt_price,
+    describe_tts_price,
+    list_stt_models,
+    list_tts_models,
+)
 from .stt_handler import OpenRouterSttEventHandler, get_stt_wyoming_info
 from .tts_handler import OpenRouterTtsEventHandler, get_tts_wyoming_info
 
@@ -56,8 +62,7 @@ async def main() -> None:
     try:
         stt_catalog = await asyncio.to_thread(list_stt_models)
         stt_line = ", ".join(
-            f"{m['id']} (${m.get('pricing', {}).get('prompt', '?')})"
-            for m in stt_catalog
+            f"{m['id']} ({describe_stt_price(m)})" for m in stt_catalog
         )
         _LOGGER.info(
             "Live OpenRouter STT model catalog: %s", stt_line or "<none returned>"
@@ -73,8 +78,7 @@ async def main() -> None:
     try:
         tts_catalog = await asyncio.to_thread(list_tts_models)
         tts_line = ", ".join(
-            f"{m['id']} (${m.get('pricing', {}).get('prompt', '?')}/char)"
-            for m in tts_catalog
+            f"{m['id']} ({describe_tts_price(m)})" for m in tts_catalog
         )
         _LOGGER.info(
             "Live OpenRouter TTS model catalog: %s", tts_line or "<none returned>"

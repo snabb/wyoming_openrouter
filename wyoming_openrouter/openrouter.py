@@ -140,7 +140,9 @@ def transcribe(
     )
 
 
-def list_stt_models(api_key: Optional[str] = None, timeout: float = 10.0) -> list[dict[str, Any]]:
+def list_stt_models(
+    api_key: Optional[str] = None, timeout: float = 10.0
+) -> list[dict[str, Any]]:
     """Best-effort fetch of the live OpenRouter STT model catalog for the startup log.
 
     Never raises: callers should log-and-continue on failure rather than block
@@ -157,7 +159,9 @@ def list_stt_models(api_key: Optional[str] = None, timeout: float = 10.0) -> lis
     return response.json().get("data", [])
 
 
-def list_tts_models(api_key: Optional[str] = None, timeout: float = 10.0) -> list[dict[str, Any]]:
+def list_tts_models(
+    api_key: Optional[str] = None, timeout: float = 10.0
+) -> list[dict[str, Any]]:
     """Best-effort fetch of the live OpenRouter TTS model catalog for the startup log."""
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     response = requests.get(
@@ -242,7 +246,9 @@ def synthesize_stream(
         response.close()
         raise OpenRouterError(f"OpenRouter speech request failed: {message}") from exc
 
-    rate, channels = _parse_speech_content_type(response.headers.get("Content-Type", ""))
+    rate, channels = _parse_speech_content_type(
+        response.headers.get("Content-Type", "")
+    )
     meta = SpeechMeta(
         rate=rate,
         width=_SPEECH_SAMPLE_WIDTH,
@@ -288,6 +294,51 @@ def build_price_per_char_table(catalog: list[dict[str, Any]]) -> dict[str, float
         except (KeyError, TypeError, ValueError):
             continue
     return table
+
+
+def _priced_per_token(pricing: dict[str, Any]) -> bool:
+    try:
+        return float(pricing.get("completion") or 0) != 0
+    except (TypeError, ValueError):
+        return False
+
+
+def describe_tts_price(model: dict[str, Any]) -> str:
+    """Format a TTS catalog entry's price for a human-readable log line.
+
+    A nonzero pricing.completion means the model isn't priced per input
+    character (see build_price_per_char_table) -- labeling it "/char"
+    regardless would be misleading, so such models are called out as
+    priced some other way instead of guessing which.
+    """
+    pricing = model.get("pricing") or {}
+    prompt = pricing.get("prompt", "?")
+    if _priced_per_token(pricing):
+        return f"${prompt}/char (approx -- priced per output audio token, not input character)"
+    return f"${prompt}/char"
+
+
+def describe_stt_price(model: dict[str, Any]) -> str:
+    """Format an STT catalog entry's price for a human-readable log line.
+
+    Unlike TTS, STT models have no single common billing unit: confirmed
+    live, models with an identical-looking pricing.prompt value are billed
+    per second, per minute, or per token depending on the model, and the
+    catalog gives no field to tell which -- only some model descriptions say
+    so explicitly (e.g. "priced per token"). A nonzero pricing.completion is
+    the one reliable signal available (seen on both OpenAI transcribe
+    models, which do state "per token" in their description), so those are
+    labeled precisely; everything else is labeled as duration-priced without
+    guessing whether that's per second or per minute. This is display-only:
+    the real cost always comes from the transcription response's
+    usage.cost, never computed locally.
+    """
+    pricing = model.get("pricing") or {}
+    prompt = pricing.get("prompt", "?")
+    completion = pricing.get("completion", "?")
+    if _priced_per_token(pricing):
+        return f"${prompt}/input-token, ${completion}/output-token"
+    return f"${prompt}/sec-or-min of audio (unit varies by model; see model page)"
 
 
 def get_generation_cost(
