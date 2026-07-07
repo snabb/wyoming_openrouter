@@ -47,22 +47,12 @@ async def main() -> None:
 
     _LOGGER.info("Starting Wyoming OpenRouter server v%s", __version__)
 
-    try:
-        tasks = load_config(args.config)
-    except (ConfigError, OSError) as exc:
-        _LOGGER.critical("Invalid configuration (%s): %s", args.config, exc)
-        sys.exit(1)
-
-    _LOGGER.info(
-        "Configured %d task(s): %s",
-        len(tasks),
-        ", ".join(f"{t.name} ({t.type}:{t.port})" for t in tasks),
-    )
-
-    # Best-effort only: users pick a task's `model` by checking these log
-    # lines (or OpenRouter's own model listing directly), so a failure here
-    # must never block startup. No auth needed -- OpenRouter's /models
-    # listing is public.
+    # Logged unconditionally, before config validation: the default shipped
+    # config (a placeholder task with no api_key) fails validation below, and
+    # users are meant to pick a `model` slug by reading this log -- it must
+    # not be skipped just because the config isn't valid (or isn't filled in)
+    # yet. Best-effort only, so a fetch failure never blocks startup. No auth
+    # needed -- OpenRouter's /models listing is public.
     try:
         stt_catalog = await asyncio.to_thread(list_stt_models)
         stt_line = ", ".join(
@@ -96,6 +86,18 @@ async def main() -> None:
             exc_info=True,
         )
     tts_pricing = build_price_per_char_table(tts_catalog)
+
+    try:
+        tasks = load_config(args.config)
+    except (ConfigError, OSError) as exc:
+        _LOGGER.critical("Invalid configuration (%s): %s", args.config, exc)
+        sys.exit(1)
+
+    _LOGGER.info(
+        "Configured %d task(s): %s",
+        len(tasks),
+        ", ".join(f"{t.name} ({t.type}:{t.port})" for t in tasks),
+    )
 
     # Bind all interfaces (IPv4 + IPv6) when host is the wildcard: Home
     # Assistant's hassio network is dual-stack and may resolve the add-on to an
