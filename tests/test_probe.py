@@ -1,9 +1,22 @@
 """Tests for wyoming_openrouter.probe."""
 
+import json
 import socket
 import threading
+import time
 
 from wyoming_openrouter.probe import probe
+
+
+def _build_event_bytes(event_type: str, data: dict) -> bytes:
+    """Mimic wyoming.event.async_write_event's wire format: a JSON header
+    line with a data_length field, followed by exactly that many bytes of
+    separate JSON data (not newline-terminated, not part of the header
+    line) -- matches the real protocol, not just an easy-to-grep fake.
+    """
+    data_bytes = json.dumps(data).encode("utf-8")
+    header = json.dumps({"type": event_type, "data_length": len(data_bytes)}).encode()
+    return header + b"\n" + data_bytes
 
 
 def _serve_once(sock: socket.socket, response: bytes, ready: threading.Event) -> None:
@@ -28,16 +41,27 @@ def _start_server(response: bytes) -> tuple[int, threading.Thread]:
     return port, thread
 
 
-def test_probe_returns_true_when_response_matches():
-    port, thread = _start_server(b'{"type": "info", "data": "openrouter"}\n')
+def test_probe_returns_true_when_data_segment_matches():
+    # "openrouter" only appears in the data segment (the attribution URL),
+    # never in the header line itself -- matches the real server's actual
+    # Info response shape.
+    response = _build_event_bytes(
+        "info",
+        {"asr": [{"attribution": {"url": "https://openrouter.ai"}}]},
+    )
+    assert b"openrouter" not in response.split(b"\n", 1)[0]
+    port, thread = _start_server(response)
     try:
         assert probe(port, timeout=1.0) is True
     finally:
         thread.join(timeout=1.0)
 
 
-def test_probe_returns_false_when_response_does_not_match():
-    port, thread = _start_server(b'{"type": "info", "data": "someone-else"}\n')
+def test_probe_returns_false_when_data_segment_does_not_match():
+    response = _build_event_bytes(
+        "info", {"asr": [{"attribution": {"url": "https://example.com"}}]}
+    )
+    port, thread = _start_server(response)
     try:
         assert probe(port, timeout=1.0) is False
     finally:
@@ -48,11 +72,20 @@ def test_probe_returns_false_when_nothing_is_listening():
     assert probe(59999, timeout=0.5) is False
 
 
+def test_probe_returns_false_on_malformed_header():
+    port, thread = _start_server(b"not json at all\n")
+    try:
+        assert probe(port, timeout=1.0) is False
+    finally:
+        thread.join(timeout=1.0)
+
+
 def test_probe_is_fast_when_server_responds_immediately():
     """The whole point: no artificial idle-timeout floor like `nc -w N` has."""
-    import time
-
-    port, thread = _start_server(b'{"type": "info", "data": "openrouter"}\n')
+    response = _build_event_bytes(
+        "info", {"asr": [{"attribution": {"url": "https://openrouter.ai"}}]}
+    )
+    port, thread = _start_server(response)
     try:
         start = time.monotonic()
         assert probe(port, timeout=5.0) is True
