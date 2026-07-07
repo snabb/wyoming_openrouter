@@ -54,18 +54,33 @@ async def main() -> None:
 
     _LOGGER.info("Starting Wyoming OpenRouter server v%s", __version__)
 
-    # Logged unconditionally, before config validation: the default shipped
-    # config (a placeholder task with no api_key) fails validation below, and
-    # users are meant to pick a `model` slug by reading this log -- it must
-    # not be skipped just because the config isn't valid (or isn't filled in)
-    # yet. Best-effort only, so a fetch failure never blocks startup. No auth
-    # needed -- OpenRouter's /models listing is public.
-    #
-    # Fetched concurrently, not sequentially: each is a separate blocking
-    # HTTP call with its own (generous) timeout, and running them one after
-    # another would double the worst-case delay before any task's port
-    # binds -- directly extending the container's healthcheck start-period
-    # for no benefit, since the two catalogs don't depend on each other.
+    try:
+        tasks = load_config(args.config)
+    except (ConfigError, OSError) as exc:
+        _LOGGER.critical("Invalid configuration (%s): %s", args.config, exc)
+        sys.exit(1)
+
+    _LOGGER.info(
+        "Configured %d task(s): %s",
+        len(tasks),
+        ", ".join(f"{t.name} ({t.type}:{t.port})" for t in tasks),
+    )
+
+    # Populated in place once the TTS catalog fetch below completes (used as
+    # a fallback cost estimate -- see tts_handler.py); starts empty rather
+    # than being awaited up front, since every task's port binds below
+    # without waiting on it.
+    tts_pricing: dict[str, float] = {}
+
+    # Logged, not awaited, before any task's port binds below: catalog
+    # fetching is purely informational (never required for the server to
+    # function) and was previously blocking every task's port from binding
+    # until both catalog HTTP calls finished -- directly extending the
+    # container's healthcheck start-period for a slow/timed-out OpenRouter
+    # response, for zero benefit. Both run as TaskGroup members alongside the
+    # per-task servers instead, so a slow catalog fetch no longer delays
+    # startup at all. No auth needed -- OpenRouter's /models listing is
+    # public.
     async def _log_stt_catalog() -> None:
         try:
             stt_catalog = await asyncio.to_thread(list_stt_models)
@@ -94,7 +109,7 @@ async def main() -> None:
                 exc_info=not isinstance(exc, requests.exceptions.RequestException),
             )
 
-    async def _fetch_tts_catalog() -> list:
+    async def _log_tts_catalog_and_update_pricing() -> None:
         try:
             tts_catalog = await asyncio.to_thread(list_tts_models)
             tts_line = ", ".join(
@@ -103,7 +118,7 @@ async def main() -> None:
             _LOGGER.info(
                 "Live OpenRouter TTS model catalog: %s", tts_line or "<none returned>"
             )
-            return tts_catalog
+            tts_pricing.update(build_price_per_char_table(tts_catalog))
         except Exception as exc:
             _LOGGER.warning(
                 "Could not fetch the live OpenRouter TTS model catalog: %s "
@@ -111,22 +126,6 @@ async def main() -> None:
                 exc,
                 exc_info=not isinstance(exc, requests.exceptions.RequestException),
             )
-            return []
-
-    _, tts_catalog = await asyncio.gather(_log_stt_catalog(), _fetch_tts_catalog())
-    tts_pricing = build_price_per_char_table(tts_catalog)
-
-    try:
-        tasks = load_config(args.config)
-    except (ConfigError, OSError) as exc:
-        _LOGGER.critical("Invalid configuration (%s): %s", args.config, exc)
-        sys.exit(1)
-
-    _LOGGER.info(
-        "Configured %d task(s): %s",
-        len(tasks),
-        ", ".join(f"{t.name} ({t.type}:{t.port})" for t in tasks),
-    )
 
     # Bind all interfaces (IPv4 + IPv6) when host is the wildcard: Home
     # Assistant's hassio network is dual-stack and may resolve the add-on to an
@@ -138,8 +137,11 @@ async def main() -> None:
     # TaskGroup (not gather): if one task's port is already in use, the whole
     # process fails fast via structured-concurrency cancellation rather than
     # silently running a partial set of tasks -- the right behavior for a
-    # supervised container process.
+    # supervised container process. The two catalog tasks never raise (both
+    # catch everything internally), so they can't trigger that cancellation.
     async with asyncio.TaskGroup() as tg:
+        tg.create_task(_log_stt_catalog(), name="stt-catalog-log")
+        tg.create_task(_log_tts_catalog_and_update_pricing(), name="tts-catalog-log")
         for task in tasks:
             metrics = Metrics(task_type=task.type, task_slug=task.slug)
             if task.type == "stt":
