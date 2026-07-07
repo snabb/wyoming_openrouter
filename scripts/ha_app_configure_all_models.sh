@@ -162,8 +162,11 @@ fi
 
 ip=$(hass-cli -o json raw ws supervisor/api \
     --json "{\"endpoint\":\"/addons/$slug/info\",\"method\":\"get\"}" | jq -r '.result.ip_address')
-echo "App is up at $ip. Waiting a bit for every task's port to come online..."
-sleep 15
+# No extra wait needed here: 'started' above is itself gated behind the
+# Docker healthcheck passing, which already probes every configured task's
+# port (see healthcheck.sh) -- by the time we see 'started', every port is
+# already confirmed listening and Describe-capable.
+echo "App is up at $ip."
 
 echo "Creating/refreshing Wyoming Protocol integration entries..."
 existing_entries=$(curl -sS -H "Authorization: Bearer $HASS_TOKEN" \
