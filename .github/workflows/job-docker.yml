@@ -209,7 +209,8 @@ jobs:
                         "api_key": "unused-in-ci",
                         "type": "stt",
                         "port": 10300,
-                        "model": "openai/gpt-4o-mini-transcribe"
+                        "model": "openai/gpt-4o-mini-transcribe",
+                        "language": "en"
                       }
                     ]
                   }

@@ -48,7 +48,11 @@ configuration:
                 description: HTTP request timeout in seconds.
             language:
                 name: Language (STT)
-                description: Advertised to Home Assistant's UI. STT tasks only.
+                description: >-
+                    Required for STT tasks. Advertised to Home Assistant as
+                    this task's supported language (e.g. "en") -- an Assist
+                    pipeline can only select this task if its language
+                    matches.
             default_language:
                 name: Default language (STT)
                 description: >-

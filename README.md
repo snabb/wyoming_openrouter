@@ -121,7 +121,7 @@ value):
 | `model` | all | Any OpenRouter model slug -- check the startup log for the live catalog + prices |
 | `timeout` | all | HTTP timeout in seconds (default `60`) |
 | `provider` | all | Advanced: raw JSON string, passed through as OpenRouter's `provider` field |
-| `language` | stt | Advertised to Home Assistant's UI |
+| `language` | stt | Required; advertised to Home Assistant as this task's supported language (e.g. `en`) -- an Assist pipeline can only select this task if its language matches |
 | `default_language` | stt | Hint sent to OpenRouter only when a request doesn't specify one; empty lets the model auto-detect |
 | `temperature` | stt | `0`-`1`, sampling parameter |
 | `voice` | tts | Required; valid values are model-specific -- see the startup log |

@@ -95,6 +95,17 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
             f"tasks[{index}] ({name}): 'voice' is required for a tts task"
         )
 
+    language = raw.get("language") or None
+    if task_type == "stt" and not language:
+        # Advertised to Home Assistant as this task's sole supported_language
+        # (see stt_handler.get_stt_wyoming_info) -- an empty value there
+        # silently produces an entity that supports zero languages and can
+        # never be selected in an Assist pipeline, with no error anywhere to
+        # explain why. Fail loudly here instead.
+        raise ConfigError(
+            f"tasks[{index}] ({name}): 'language' is required for a stt task"
+        )
+
     audio_format = raw.get("audio_format") or "pcm"
     if audio_format not in VALID_AUDIO_FORMATS:
         raise ConfigError(
@@ -103,9 +114,7 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
         )
 
     temperature_raw = raw.get("temperature")
-    temperature = (
-        float(temperature_raw) if temperature_raw not in (None, "") else None
-    )
+    temperature = float(temperature_raw) if temperature_raw not in (None, "") else None
 
     return TaskConfig(
         name=name,
@@ -114,7 +123,7 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
         port=port,
         model=model,
         timeout=float(raw.get("timeout") or 60.0),
-        language=raw.get("language") or None,
+        language=language,
         default_language=raw.get("default_language") or None,
         temperature=temperature,
         voice=voice,

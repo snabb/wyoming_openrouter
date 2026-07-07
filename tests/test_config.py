@@ -12,6 +12,7 @@ def _stt_task(**overrides):
         "type": "stt",
         "port": 10300,
         "model": "openai/gpt-4o-mini-transcribe",
+        "language": "en",
     }
     task.update(overrides)
     return task
@@ -81,6 +82,18 @@ def test_voice_not_required_for_stt():
     assert tasks[0].voice is None
 
 
+def test_language_required_for_stt():
+    task = _stt_task()
+    del task["language"]
+    with pytest.raises(ConfigError, match="'language' is required for a stt task"):
+        plan_tasks({"tasks": [task]})
+
+
+def test_language_not_required_for_tts():
+    tasks = plan_tasks({"tasks": [_tts_task()]})
+    assert tasks[0].language is None
+
+
 def test_duplicate_ports_raise():
     with pytest.raises(ConfigError, match="both use port 10300"):
         plan_tasks(
@@ -114,9 +127,7 @@ def test_invalid_provider_json_raises():
 
 
 def test_valid_provider_json_parsed():
-    tasks = plan_tasks(
-        {"tasks": [_stt_task(provider='{"order": ["openai"]}')]}
-    )
+    tasks = plan_tasks({"tasks": [_stt_task(provider='{"order": ["openai"]}')]})
     assert tasks[0].provider == {"order": ["openai"]}
 
 
