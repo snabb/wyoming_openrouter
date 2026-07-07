@@ -34,6 +34,17 @@ _FALLBACK_CHANNELS = 1
 
 def get_tts_wyoming_info(task: TaskConfig) -> Info:
     """Create Wyoming info describing this task's single dedicated TTS model/voice."""
+    # HA's WyomingTtsProvider only sets _attr_default_language when
+    # _attr_supported_languages is non-empty (derived from voice.languages)
+    # -- otherwise it never sets the attribute at all, and HA's tts entity
+    # base class crashes with AttributeError the moment it's added
+    # (accessing the default_language cached property), taking the whole
+    # entity down. Confirmed live: an empty languages list here doesn't just
+    # leave the entity unselectable (like the analogous stt case), it
+    # prevents the entity from being created at all. task.language is
+    # STT-focused in the schema but doubles as an optional override here;
+    # default to "en" so this can never be empty.
+    languages = [task.language] if task.language else ["en"]
     return Info(
         tts=[
             TtsProgram(
@@ -54,7 +65,7 @@ def get_tts_wyoming_info(task: TaskConfig) -> Info:
                         installed=True,
                         description=f"OpenRouter TTS voice: {task.voice}",
                         version=None,
-                        languages=[],
+                        languages=languages,
                     )
                 ],
                 supports_synthesize_streaming=True,

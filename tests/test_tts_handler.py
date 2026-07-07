@@ -11,7 +11,10 @@ from wyoming.tts import Synthesize, SynthesizeVoice
 from wyoming_openrouter.config import plan_tasks
 from wyoming_openrouter.ha_metrics import Metrics
 from wyoming_openrouter.openrouter import SpeechMeta
-from wyoming_openrouter.tts_handler import OpenRouterTtsEventHandler, get_tts_wyoming_info
+from wyoming_openrouter.tts_handler import (
+    OpenRouterTtsEventHandler,
+    get_tts_wyoming_info,
+)
 
 
 def _task(**overrides):
@@ -50,7 +53,9 @@ class _RecordingHandler(OpenRouterTtsEventHandler):
 
 
 def _fake_meta(rate=24000, width=2, channels=1, generation_id="gen-1"):
-    return SpeechMeta(rate=rate, width=width, channels=channels, generation_id=generation_id)
+    return SpeechMeta(
+        rate=rate, width=width, channels=channels, generation_id=generation_id
+    )
 
 
 async def _await_background(handler):
@@ -82,6 +87,21 @@ def test_get_tts_wyoming_info_single_voice():
     assert len(info.tts) == 1
     assert info.tts[0].voices[0].name == "af_nova"
     assert info.tts[0].supports_synthesize_streaming is True
+
+
+def test_get_tts_wyoming_info_defaults_to_english_when_no_language_set():
+    # A voice with an empty languages list crashes HA's tts entity setup
+    # entirely (AttributeError on default_language) -- must never be empty.
+    task = _task(voice="af_nova")
+    assert task.language is None
+    info = get_tts_wyoming_info(task)
+    assert info.tts[0].voices[0].languages == ["en"]
+
+
+def test_get_tts_wyoming_info_honors_language_override():
+    task = _task(voice="fr_marie_neutral", language="fr")
+    info = get_tts_wyoming_info(task)
+    assert info.tts[0].voices[0].languages == ["fr"]
 
 
 # --- full synthesize flow --------------------------------------------------------
@@ -311,9 +331,7 @@ def test_audio_stop_and_synthesize_stopped_written_before_cost_resolution_comple
                 "wyoming_openrouter.tts_handler.openrouter.get_generation_cost",
                 return_value=0.0001,
             ),
-            patch(
-                "wyoming_openrouter.tts_handler.push_to_supervisor", new=AsyncMock()
-            ),
+            patch("wyoming_openrouter.tts_handler.push_to_supervisor", new=AsyncMock()),
             patch("wyoming_openrouter.tts_handler.asyncio.sleep", new=AsyncMock()),
         ):
             await handler.handle_event(Synthesize(text="hi").event())
