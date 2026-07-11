@@ -138,6 +138,18 @@ def test_invalid_provider_json_raises():
         plan_tasks({"tasks": [_stt_task(provider="{not json")]})
 
 
+def test_provider_object_is_accepted_without_reencoding():
+    provider = {"order": ["openai"]}
+    tasks = plan_tasks({"tasks": [_stt_task(provider=provider)]})
+    assert tasks[0].provider == provider
+
+
+@pytest.mark.parametrize("provider", ['["openai"]', ["openai"], 123])
+def test_provider_must_be_an_object(provider):
+    with pytest.raises(ConfigError, match="'provider'.*object"):
+        plan_tasks({"tasks": [_stt_task(provider=provider)]})
+
+
 def test_valid_provider_json_parsed():
     tasks = plan_tasks({"tasks": [_stt_task(provider='{"order": ["openai"]}')]})
     assert tasks[0].provider == {"order": ["openai"]}
@@ -156,3 +168,21 @@ def test_audio_format_mp3_accepted():
 def test_invalid_audio_format_raises():
     with pytest.raises(ConfigError, match="'audio_format' must be one of"):
         plan_tasks({"tasks": [_tts_task(audio_format="ogg")]})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("port", "not-a-port"), ("timeout", "slow"), ("temperature", {}), ("speed", [])],
+)
+def test_invalid_numeric_fields_raise_config_error(field, value):
+    with pytest.raises(ConfigError, match=rf"'{field}' must be a number"):
+        plan_tasks({"tasks": [_stt_task(**{field: value})]})
+
+
+def test_task_and_root_shapes_are_validated():
+    with pytest.raises(ConfigError, match="root must be an object"):
+        plan_tasks([])
+    with pytest.raises(ConfigError, match="'tasks' must be a list"):
+        plan_tasks({"tasks": {"name": "not-a-list"}})
+    with pytest.raises(ConfigError, match=r"tasks\[0\] must be an object"):
+        plan_tasks({"tasks": ["not-an-object"]})

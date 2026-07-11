@@ -67,7 +67,34 @@ def _require(raw: dict[str, Any], key: str, index: int, name: str = "") -> Any:
     return value
 
 
+def _parse_number(
+    raw: dict[str, Any], key: str, index: int, name: str, number_type: type
+) -> Any:
+    value = _require(raw, key, index, name)
+    if isinstance(value, bool):
+        raise ConfigError(
+            f"tasks[{index}] ({name}): '{key}' must be a number, got {value!r}"
+        )
+    try:
+        return number_type(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"tasks[{index}] ({name}): '{key}' must be a number, got {value!r}"
+        ) from exc
+
+
+def _parse_optional_float(
+    raw: dict[str, Any], key: str, index: int, name: str, default: Optional[float]
+) -> Optional[float]:
+    value = raw.get(key)
+    if value in (None, ""):
+        return default
+    return _parse_number(raw, key, index, name, float)
+
+
 def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
+    if not isinstance(raw, dict):
+        raise ConfigError(f"tasks[{index}] must be an object")
     name = str(_require(raw, "name", index))
     api_key = str(_require(raw, "api_key", index, name))
     task_type = str(_require(raw, "type", index, name))
@@ -76,18 +103,30 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
             f"tasks[{index}] ({name}): 'type' must be one of "
             f"{sorted(VALID_TYPES)}, got {task_type!r}"
         )
-    port = int(_require(raw, "port", index, name))
+    port = _parse_number(raw, "port", index, name, int)
     model = str(_require(raw, "model", index, name))
 
     provider: Optional[dict[str, Any]] = None
     provider_raw = raw.get("provider")
     if provider_raw:
-        try:
-            provider = json.loads(provider_raw)
-        except json.JSONDecodeError as exc:
+        if isinstance(provider_raw, dict):
+            provider = provider_raw
+        elif isinstance(provider_raw, str):
+            try:
+                parsed_provider = json.loads(provider_raw)
+            except json.JSONDecodeError as exc:
+                raise ConfigError(
+                    f"tasks[{index}] ({name}): 'provider' is not valid JSON: {exc}"
+                ) from exc
+            if not isinstance(parsed_provider, dict):
+                raise ConfigError(
+                    f"tasks[{index}] ({name}): 'provider' JSON must be an object"
+                )
+            provider = parsed_provider
+        else:
             raise ConfigError(
-                f"tasks[{index}] ({name}): 'provider' is not valid JSON: {exc}"
-            ) from exc
+                f"tasks[{index}] ({name}): 'provider' must be a JSON object or string"
+            )
 
     voice = raw.get("voice") or None
     if task_type == "tts" and not voice:
@@ -113,8 +152,11 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
             f"{sorted(VALID_AUDIO_FORMATS)}, got {audio_format!r}"
         )
 
-    temperature_raw = raw.get("temperature")
-    temperature = float(temperature_raw) if temperature_raw not in (None, "") else None
+    temperature = _parse_optional_float(raw, "temperature", index, name, None)
+    timeout = _parse_optional_float(raw, "timeout", index, name, 60.0)
+    speed = _parse_optional_float(raw, "speed", index, name, 1.0)
+    assert timeout is not None
+    assert speed is not None
 
     return TaskConfig(
         name=name,
@@ -122,20 +164,24 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
         type=task_type,
         port=port,
         model=model,
-        timeout=float(raw.get("timeout") or 60.0),
+        timeout=timeout,
         language=language,
         default_language=raw.get("default_language") or None,
         temperature=temperature,
         voice=voice,
-        speed=float(raw.get("speed") or 1.0),
+        speed=speed,
         audio_format=audio_format,
         provider=provider,
     )
 
 
-def plan_tasks(data: dict[str, Any]) -> list[TaskConfig]:
+def plan_tasks(data: Any) -> list[TaskConfig]:
     """Parse and validate the raw config dict into a flat, ready-to-serve task list."""
+    if not isinstance(data, dict):
+        raise ConfigError("configuration root must be an object")
     raw_tasks = data.get("tasks") or []
+    if not isinstance(raw_tasks, list):
+        raise ConfigError("'tasks' must be a list")
     if not raw_tasks:
         raise ConfigError("no tasks configured; at least one is required")
 
