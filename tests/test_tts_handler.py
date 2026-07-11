@@ -92,15 +92,15 @@ def test_get_tts_wyoming_info_defaults_to_english_when_no_language_set():
     # A voice with an empty languages list crashes HA's tts entity setup
     # entirely (AttributeError on default_language) -- must never be empty.
     task = _task(voice="af_nova")
-    assert task.language is None
+    assert task.languages == ["en"]
     info = get_tts_wyoming_info(task)
     assert info.tts[0].voices[0].languages == ["en"]
 
 
-def test_get_tts_wyoming_info_honors_language_override():
-    task = _task(voice="fr_marie_neutral", language="fr")
+def test_get_tts_wyoming_info_honors_languages_override():
+    task = _task(voice="fr_marie_neutral", languages=["fr", "de"])
     info = get_tts_wyoming_info(task)
-    assert info.tts[0].voices[0].languages == ["fr"]
+    assert info.tts[0].voices[0].languages == ["fr", "de"]
 
 
 # --- full synthesize flow --------------------------------------------------------

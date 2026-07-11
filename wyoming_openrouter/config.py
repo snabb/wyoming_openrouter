@@ -38,7 +38,7 @@ class TaskConfig:
     model: str
     timeout: float = 60.0
     # STT-specific
-    language: Optional[str] = None
+    languages: list[str] = field(default_factory=list)
     default_language: Optional[str] = None
     temperature: Optional[float] = None
     # TTS-specific
@@ -92,6 +92,39 @@ def _parse_optional_float(
     return _parse_number(raw, key, index, name, float)
 
 
+def _parse_languages(raw: dict[str, Any], index: int, name: str) -> list[str]:
+    """Parse JSON-list or Supervisor-friendly comma-separated languages."""
+    if "language" in raw:
+        raise ConfigError(
+            f"tasks[{index}] ({name}): 'language' was replaced by 'languages'"
+        )
+
+    value = raw.get("languages")
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        values: list[Any] = value.split(",")
+    elif isinstance(value, list):
+        values = value
+    else:
+        raise ConfigError(
+            f"tasks[{index}] ({name}): 'languages' must be a list or "
+            "comma-separated string"
+        )
+
+    languages: list[str] = []
+    for language in values:
+        if not isinstance(language, str) or not language.strip():
+            raise ConfigError(
+                f"tasks[{index}] ({name}): 'languages' entries must be "
+                "non-empty strings"
+            )
+        normalized = language.strip()
+        if normalized not in languages:
+            languages.append(normalized)
+    return languages
+
+
 def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
     if not isinstance(raw, dict):
         raise ConfigError(f"tasks[{index}] must be an object")
@@ -134,16 +167,18 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
             f"tasks[{index}] ({name}): 'voice' is required for a tts task"
         )
 
-    language = raw.get("language") or None
-    if task_type == "stt" and not language:
-        # Advertised to Home Assistant as this task's sole supported_language
+    languages = _parse_languages(raw, index, name)
+    if task_type == "stt" and not languages:
+        # Advertised to Home Assistant as this task's supported_languages
         # (see stt_handler.get_stt_wyoming_info) -- an empty value there
         # silently produces an entity that supports zero languages and can
         # never be selected in an Assist pipeline, with no error anywhere to
         # explain why. Fail loudly here instead.
         raise ConfigError(
-            f"tasks[{index}] ({name}): 'language' is required for a stt task"
+            f"tasks[{index}] ({name}): 'languages' is required for a stt task"
         )
+    if task_type == "tts" and not languages:
+        languages = ["en"]
 
     audio_format = raw.get("audio_format") or "pcm"
     if audio_format not in VALID_AUDIO_FORMATS:
@@ -165,7 +200,7 @@ def _parse_task(raw: dict[str, Any], index: int) -> TaskConfig:
         port=port,
         model=model,
         timeout=timeout,
-        language=language,
+        languages=languages,
         default_language=raw.get("default_language") or None,
         temperature=temperature,
         voice=voice,

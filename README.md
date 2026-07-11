@@ -97,7 +97,7 @@ value):
       "type": "stt",
       "port": 10300,
       "model": "openai/gpt-4o-mini-transcribe",
-      "language": "en"
+      "languages": ["en", "fi"]
     },
     {
       "name": "assist-tts",
@@ -121,7 +121,7 @@ value):
 | `model` | all | Any OpenRouter model slug -- check the startup log for the live catalog + prices |
 | `timeout` | all | HTTP timeout in seconds (default `60`) |
 | `provider` | all | Advanced: raw JSON string, passed through as OpenRouter's `provider` field |
-| `language` | stt, tts | Required for stt; advertised to Home Assistant as this task's supported language (e.g. `en`) -- an Assist pipeline can only select this task if its language matches. Optional for tts (defaults to `en`) -- set it if the task's `voice` speaks a different language, or Home Assistant will misadvertise it |
+| `languages` | stt, tts | Required JSON list for standalone STT tasks; advertised to Home Assistant as the task's supported languages. Optional for TTS (defaults to `en`). In the Home Assistant App UI, enter the same values as a comma-separated string such as `en,fi,de` |
 | `default_language` | stt | Hint sent to OpenRouter only when a request doesn't specify one; empty lets the model auto-detect |
 | `temperature` | stt | `0`-`1`, sampling parameter |
 | `voice` | tts | Required; valid values are model-specific -- see the startup log. To offer several voices for the same model, configure one task per voice (each gets its own port/HA entity) |

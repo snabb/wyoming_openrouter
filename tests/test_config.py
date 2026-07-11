@@ -11,7 +11,7 @@ def _stt_task(**overrides):
         "type": "stt",
         "port": 10300,
         "model": "openai/gpt-4o-mini-transcribe",
-        "language": "en",
+        "languages": ["en"],
     }
     task.update(overrides)
     return task
@@ -83,14 +83,41 @@ def test_voice_not_required_for_stt():
 
 def test_language_required_for_stt():
     task = _stt_task()
-    del task["language"]
-    with pytest.raises(ConfigError, match="'language' is required for a stt task"):
+    del task["languages"]
+    with pytest.raises(ConfigError, match="'languages' is required for a stt task"):
         plan_tasks({"tasks": [task]})
 
 
 def test_language_not_required_for_tts():
     tasks = plan_tasks({"tasks": [_tts_task()]})
-    assert tasks[0].language is None
+    assert tasks[0].languages == ["en"]
+
+
+def test_languages_accept_list_and_comma_separated_string():
+    tasks = plan_tasks(
+        {
+            "tasks": [
+                _stt_task(languages=["en", "fi", "en"]),
+                _tts_task(languages="fr, de, fr"),
+            ]
+        }
+    )
+    assert tasks[0].languages == ["en", "fi"]
+    assert tasks[1].languages == ["fr", "de"]
+
+
+@pytest.mark.parametrize("languages", [["en", ""], ["en", 1], 123, {}])
+def test_invalid_languages_raise(languages):
+    with pytest.raises(ConfigError, match="'languages'.*(entries|list)"):
+        plan_tasks({"tasks": [_stt_task(languages=languages)]})
+
+
+def test_legacy_language_is_rejected():
+    task = _stt_task()
+    del task["languages"]
+    task["language"] = "en"
+    with pytest.raises(ConfigError, match="'language' was replaced by 'languages'"):
+        plan_tasks({"tasks": [task]})
 
 
 def test_duplicate_ports_raise():

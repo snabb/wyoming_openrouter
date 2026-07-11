@@ -41,10 +41,8 @@ def get_tts_wyoming_info(task: TaskConfig) -> Info:
     # (accessing the default_language cached property), taking the whole
     # entity down. Confirmed live: an empty languages list here doesn't just
     # leave the entity unselectable (like the analogous stt case), it
-    # prevents the entity from being created at all. task.language is
-    # STT-focused in the schema but doubles as an optional override here;
-    # default to "en" so this can never be empty.
-    languages = [task.language] if task.language else ["en"]
+    # prevents the entity from being created at all. Config validation defaults
+    # TTS tasks to English, so this list can never be empty.
     return Info(
         tts=[
             TtsProgram(
@@ -65,7 +63,7 @@ def get_tts_wyoming_info(task: TaskConfig) -> Info:
                         installed=True,
                         description=f"OpenRouter TTS voice: {task.voice}",
                         version=None,
-                        languages=languages,
+                        languages=task.languages,
                     )
                 ],
                 supports_synthesize_streaming=True,

@@ -23,7 +23,7 @@ def _task(**overrides):
         "type": "stt",
         "port": 10300,
         "model": "openai/gpt-4o-mini-transcribe",
-        "language": "en",
+        "languages": ["en"],
     }
     raw.update(overrides)
     return plan_tasks({"tasks": [raw]})[0]
@@ -81,12 +81,12 @@ def test_describe_returns_info():
 
 
 def test_get_stt_wyoming_info_single_model():
-    task = _task(language="es")
+    task = _task(languages=["es", "fi"])
     info = get_stt_wyoming_info(task)
     assert len(info.asr) == 1
     assert len(info.asr[0].models) == 1
     assert info.asr[0].models[0].name == task.model
-    assert info.asr[0].models[0].languages == ["es"]
+    assert info.asr[0].models[0].languages == ["es", "fi"]
 
 
 # --- full transcription flow ----------------------------------------------------

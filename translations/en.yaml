@@ -46,15 +46,14 @@ configuration:
             timeout:
                 name: Timeout
                 description: HTTP request timeout in seconds.
-            language:
-                name: Language
+            languages:
+                name: Languages
                 description: >-
                     Required for STT tasks; optional for TTS tasks (defaults
-                    to "en" if left empty -- set it if the task's voice
-                    speaks a different language). Advertised to Home
-                    Assistant as this task's supported language (e.g. "en")
-                    -- an Assist pipeline can only select this task if its
-                    language matches.
+                    to "en" if left empty). Enter a comma-separated list such
+                    as "en,fi,de". Advertised to Home Assistant as this task's
+                    supported languages -- an Assist pipeline can only select
+                    this task if its language matches.
             default_language:
                 name: Default language (STT)
                 description: >-

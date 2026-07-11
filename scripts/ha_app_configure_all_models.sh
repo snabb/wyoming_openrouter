@@ -19,6 +19,8 @@
 # Usage: scripts/ha_app_configure_all_models.sh
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
 : "${HASS_SERVER:?HASS_SERVER must be set}"
 : "${HASS_TOKEN:?HASS_TOKEN must be set}"
 : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY must be set}"
@@ -49,12 +51,15 @@ trap 'rm -rf "$tmpdir"' EXIT
 echo "$stt_models" > "$tmpdir/stt.json"
 echo "$tts_models" > "$tmpdir/tts.json"
 
-options_json=$(python3 - "$OPENROUTER_API_KEY" "$SKIP_MODELS" "$tmpdir/stt.json" "$tmpdir/tts.json" <<'PYEOF'
+options_json=$(python3 - "$OPENROUTER_API_KEY" "$SKIP_MODELS" "$tmpdir/stt.json" "$tmpdir/tts.json" "$SCRIPT_DIR" <<'PYEOF'
 import json
-import re
 import sys
 
-api_key, skip_csv, stt_path, tts_path = sys.argv[1:5]
+api_key, skip_csv, stt_path, tts_path, script_dir = sys.argv[1:6]
+sys.path.insert(0, script_dir)
+
+from model_languages import stt_languages, tts_languages
+
 skip = {m.strip() for m in skip_csv.split(",") if m.strip()}
 
 BASE_PORT = 10300
@@ -65,6 +70,29 @@ def slug_name(model_id: str) -> str:
     return model_id.rsplit("/", 1)[-1]
 
 
+def resolve_stt_languages(model_id: str) -> tuple[str, ...]:
+    languages = stt_languages(model_id)
+    if languages is None:
+        print(
+            f"WARNING: {model_id} has no reviewed language mapping; defaulting to en",
+            file=sys.stderr,
+        )
+        return ("en",)
+    return languages
+
+
+def resolve_tts_languages(model_id: str, voice: str) -> tuple[str, ...]:
+    languages = tts_languages(model_id, voice)
+    if languages is None:
+        print(
+            f"WARNING: {model_id} voice {voice!r} has no reviewed language "
+            "mapping; defaulting to en",
+            file=sys.stderr,
+        )
+        return ("en",)
+    return languages
+
+
 def stt_task(model_id: str, port: int) -> dict:
     return {
         "name": slug_name(model_id),
@@ -73,7 +101,7 @@ def stt_task(model_id: str, port: int) -> dict:
         "port": port,
         "model": model_id,
         "timeout": 60,
-        "language": "en",
+        "languages": ",".join(resolve_stt_languages(model_id)),
         "default_language": "",
         "temperature": 0.0,
         "voice": "",
@@ -91,7 +119,7 @@ def tts_task(model_id: str, port: int, voice: str) -> dict:
         "port": port,
         "model": model_id,
         "timeout": 60,
-        "language": "en",
+        "languages": ",".join(resolve_tts_languages(model_id, voice)),
         "default_language": "",
         "temperature": 0.0,
         "voice": voice,

@@ -39,7 +39,7 @@ packaged app) and its own Home Assistant integration entry.
 | `model` | all | Any OpenRouter model slug -- check the Log tab for the live catalog + prices |
 | `timeout` | all | HTTP timeout in seconds (default `60`) |
 | `provider` | all | Advanced: raw JSON string, passed through as OpenRouter's `provider` field |
-| `language` | stt, tts | Required for stt; advertised to Home Assistant as this task's supported language (e.g. `en`) -- an Assist pipeline can only select this task if its language matches. Optional for tts (defaults to `en`) -- set it if the task's `voice` speaks a different language |
+| `languages` | stt, tts | Required comma-separated list for STT (for example `en,fi,de`); advertised to Home Assistant as the task's supported languages. Optional for TTS (defaults to `en`) |
 | `default_language` | stt | Hint sent to OpenRouter only when a request doesn't specify one; empty lets the model auto-detect |
 | `temperature` | stt | `0`-`1`, sampling parameter |
 | `voice` | tts | Required; valid values are model-specific -- check the Log tab |

@@ -148,7 +148,7 @@ def build_task_config(
                 "type": "stt",
                 "port": port,
                 "model": stt_model["id"],
-                "language": "en",
+                "languages": ["en"],
             }
         )
         stt_ports[stt_model["id"]] = port

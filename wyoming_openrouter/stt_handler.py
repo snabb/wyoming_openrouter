@@ -21,7 +21,6 @@ _ATTRIBUTION = Attribution(name="OpenRouter", url="https://openrouter.ai")
 
 def get_stt_wyoming_info(task: TaskConfig) -> Info:
     """Create Wyoming info describing this task's single dedicated STT model."""
-    languages = [task.language] if task.language else []
     return Info(
         asr=[
             AsrProgram(
@@ -42,7 +41,7 @@ def get_stt_wyoming_info(task: TaskConfig) -> Info:
                         installed=True,
                         description=f"OpenRouter STT model: {task.model}",
                         version=None,
-                        languages=languages,
+                        languages=task.languages,
                     )
                 ],
             )
