@@ -40,20 +40,29 @@ fi
 echo "Fetching live OpenRouter STT + TTS catalogs..."
 stt_models=$(curl -sS 'https://openrouter.ai/api/v1/models?output_modalities=transcription' | jq -c '.data')
 tts_models=$(curl -sS 'https://openrouter.ai/api/v1/models?output_modalities=speech' | jq -c '.data')
+existing_tasks=$(hass-cli -o json raw ws supervisor/api \
+    --json "{\"endpoint\":\"/addons/$slug/info\",\"method\":\"get\"}" \
+    | jq -c '.result.options.tasks // []')
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 echo "$stt_models" > "$tmpdir/stt.json"
 echo "$tts_models" > "$tmpdir/tts.json"
+echo "$existing_tasks" > "$tmpdir/existing.json"
 
-options_json=$(python3 - "$OPENROUTER_API_KEY" "$SKIP_MODELS" "$tmpdir/stt.json" "$tmpdir/tts.json" "$SCRIPT_DIR" <<'PYEOF'
+options_json=$(python3 - "$OPENROUTER_API_KEY" "$SKIP_MODELS" "$tmpdir/stt.json" "$tmpdir/tts.json" "$tmpdir/existing.json" "$SCRIPT_DIR" <<'PYEOF'
 import json
 import sys
 
-api_key, skip_csv, stt_path, tts_path, script_dir = sys.argv[1:6]
+api_key, skip_csv, stt_path, tts_path, existing_path, script_dir = sys.argv[1:7]
 sys.path.insert(0, script_dir)
 
-from model_languages import stt_languages, tts_audio_format, tts_languages
+from model_languages import (
+    assign_task_ports,
+    stt_languages,
+    tts_audio_format,
+    tts_languages,
+)
 
 skip = {m.strip() for m in skip_csv.split(",") if m.strip()}
 
@@ -126,15 +135,11 @@ def tts_task(model_id: str, port: int, voice: str) -> dict:
 
 stt_models = json.load(open(stt_path))
 tts_models = json.load(open(tts_path))
+existing_tasks = json.load(open(existing_path))
 
 tasks = []
-port = BASE_PORT
-for model in stt_models:
-    if model["id"] in skip:
-        continue
-    tasks.append(stt_task(model["id"], port))
-    port += 1
-
+stt_models = [model for model in stt_models if model["id"] not in skip]
+usable_tts_models = []
 for model in tts_models:
     if model["id"] in skip:
         continue
@@ -142,25 +147,33 @@ for model in tts_models:
     if not voices:
         print(f"WARNING: {model['id']} has no supported_voices, skipping", file=sys.stderr)
         continue
-    tasks.append(tts_task(model["id"], port, voices[0]))
-    port += 1
+    usable_tts_models.append((model, voices[0]))
 
-if port - 1 > MAX_PORT:
+task_keys = [
+    *(("stt", model["id"]) for model in stt_models),
+    *(("tts", model["id"]) for model, _voice in usable_tts_models),
+]
+try:
+    ports = assign_task_ports(task_keys, existing_tasks, BASE_PORT, MAX_PORT)
+except ValueError as exc:
     print(
-        f"ERROR: {len(tasks)} tasks need ports {BASE_PORT}-{port - 1}, "
-        f"which exceeds this app's reserved range (up to {MAX_PORT}). "
-        "Narrow the catalog with SKIP_MODELS or widen the reserved range "
-        "in config.yaml/Dockerfile first.",
+        f"ERROR: {exc}. Narrow the catalog with SKIP_MODELS or widen the "
+        "reserved range in config.yaml/Dockerfile first.",
         file=sys.stderr,
     )
     sys.exit(1)
+
+for model in stt_models:
+    tasks.append(stt_task(model["id"], ports[("stt", model["id"])]))
+for model, voice in usable_tts_models:
+    tasks.append(tts_task(model["id"], ports[("tts", model["id"])], voice))
 
 print(json.dumps({"debug": True, "tasks": tasks}))
 PYEOF
 )
 
 task_count=$(echo "$options_json" | jq '.tasks | length')
-echo "Generated $task_count tasks (ports 10300-$((10300 + task_count - 1)))."
+echo "Generated $task_count tasks using reserved ports 10300-10319."
 
 echo "Writing options to the app..."
 hass-cli -o json raw ws supervisor/api --json "$(jq -n --arg slug "$slug" --argjson opts "$options_json" \

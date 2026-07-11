@@ -7,6 +7,8 @@ being assigned capabilities by parsing free-form descriptions.
 
 from __future__ import annotations
 
+from typing import Any
+
 WHISPER_LANGUAGES = (
     "af",
     "am",
@@ -335,3 +337,47 @@ def tts_audio_format(model_id: str) -> str:
     if model_id == "google/gemini-3.1-flash-tts-preview":
         return "pcm"
     return "mp3"
+
+
+def assign_task_ports(
+    task_keys: list[tuple[str, str]],
+    existing_tasks: list[dict[str, Any]],
+    first_port: int,
+    last_port: int,
+) -> dict[tuple[str, str], int]:
+    """Preserve existing model ports and assign free ports to new tasks."""
+    existing_ports: dict[tuple[str, str], int] = {}
+    for task in existing_tasks:
+        port = task.get("port")
+        if (
+            isinstance(task.get("type"), str)
+            and isinstance(task.get("model"), str)
+            and isinstance(port, int)
+            and not isinstance(port, bool)
+            and first_port <= port <= last_port
+        ):
+            existing_ports[(task["type"], task["model"])] = port
+
+    assignments: dict[tuple[str, str], int] = {}
+    used_ports: set[int] = set()
+    for key in task_keys:
+        port = existing_ports.get(key)
+        if port is not None and port not in used_ports:
+            assignments[key] = port
+            used_ports.add(port)
+
+    free_ports = set(range(first_port, last_port + 1)) - used_ports
+    for key in task_keys:
+        if key in assignments:
+            continue
+        try:
+            port = min(free_ports)
+        except ValueError as exc:
+            raise ValueError(
+                f"{len(task_keys)} tasks exceed reserved ports "
+                f"{first_port}-{last_port}"
+            ) from exc
+        assignments[key] = port
+        free_ports.remove(port)
+
+    return assignments

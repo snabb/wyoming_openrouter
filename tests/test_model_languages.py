@@ -1,7 +1,9 @@
 """Tests for the curated OpenRouter speech language map."""
 
+import pytest
 from scripts.model_languages import (
     STT_MODEL_LANGUAGES,
+    assign_task_ports,
     stt_languages,
     tts_audio_format,
     tts_languages,
@@ -30,6 +32,22 @@ def test_tts_model_wide_multilingual_voice():
 def test_tts_audio_format_uses_gemini_pcm_quirk():
     assert tts_audio_format("google/gemini-3.1-flash-tts-preview") == "pcm"
     assert tts_audio_format("x-ai/grok-voice-tts-1.0") == "mp3"
+
+
+def test_task_ports_preserve_existing_models_and_fill_free_slots():
+    keys = [("tts", "vendor/old"), ("tts", "vendor/new")]
+    existing = [{"type": "tts", "model": "vendor/old", "port": 10305}]
+    assert assign_task_ports(keys, existing, 10300, 10305) == {
+        ("tts", "vendor/old"): 10305,
+        ("tts", "vendor/new"): 10300,
+    }
+
+
+def test_task_ports_reject_exhausted_range():
+    with pytest.raises(ValueError, match="exceed reserved ports"):
+        assign_task_ports(
+            [("tts", "vendor/one"), ("tts", "vendor/two")], [], 10300, 10300
+        )
 
 
 def test_tts_locale_and_prefix_specific_voices():
