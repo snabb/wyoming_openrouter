@@ -26,7 +26,7 @@ if the script is interrupted (Ctrl-C, killed, crashes), re-running the same
 command resumes from the cache instead of re-doing already-completed work
 (and re-paying for it). Use --fresh to ignore/overwrite an existing cache.
 
-Every TTS task is configured with audio_format=mp3 for uniform compatibility
+TTS tasks use each model's live-verified compatible audio format
 across the whole catalog (not every model supports response_format=pcm --
 see README.md), which means the `mpg123` binary must be installed on
 whichever machine actually runs this script (not just inside the Docker
@@ -65,6 +65,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Direct script execution puts only scripts/ on sys.path; add the repository
+# root so the shared script helper is importable the same way as in tests.
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
+from scripts.model_languages import tts_audio_format
 from wyoming.asr import Transcribe, Transcript
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.client import AsyncTcpClient
@@ -169,10 +174,7 @@ def build_task_config(
                 "port": port,
                 "model": tts_model["id"],
                 "voice": voices[0],
-                # mp3 sidesteps "not every model supports response_format=pcm"
-                # uniformly across the whole catalog (at the cost of a local
-                # mpg123 decode pass) -- fine for a correctness-focused test.
-                "audio_format": "mp3",
+                "audio_format": tts_audio_format(tts_model["id"]),
             }
         )
         tts_ports[tts_model["id"]] = port

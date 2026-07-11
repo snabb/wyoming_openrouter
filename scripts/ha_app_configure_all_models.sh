@@ -5,11 +5,8 @@
 # matching "Wyoming Protocol" integration entry in Home Assistant for every
 # task -- this is the "add all engines" setup, not a small hand-picked one.
 #
-# Every TTS task uses audio_format=mp3 uniformly, following the same
-# reasoning as scripts/model_matrix.py: not every model supports
-# response_format=pcm, and there's no reliable way to know which from the
-# catalog alone, so mp3 (decoded locally via mpg123, already in the image)
-# is the one setting that works across the whole catalog. Each TTS task
+# TTS response formats are selected from live-verified model quirks: Gemini
+# requires pcm while the other current models work with mp3. Each TTS task
 # picks the first entry in the model's live supported_voices list -- a
 # reasonable automatic default, not a curated "best" voice.
 #
@@ -26,9 +23,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY must be set}"
 
 APP_NAME="Wyoming OpenRouter"
-# Known non-functional as of 2026-07 (returns empty audio via this
-# endpoint) -- skip by default. Set SKIP_MODELS="" to include it anyway.
-SKIP_MODELS="${SKIP_MODELS:-google/gemini-3.1-flash-tts-preview}"
+SKIP_MODELS="${SKIP_MODELS:-}"
 
 # The newer /apps REST paths error out ("unknown_error") on this Supervisor
 # version -- only the legacy /addons paths (still fully supported, just an
@@ -58,7 +53,7 @@ import sys
 api_key, skip_csv, stt_path, tts_path, script_dir = sys.argv[1:6]
 sys.path.insert(0, script_dir)
 
-from model_languages import stt_languages, tts_languages
+from model_languages import stt_languages, tts_audio_format, tts_languages
 
 skip = {m.strip() for m in skip_csv.split(",") if m.strip()}
 
@@ -124,7 +119,7 @@ def tts_task(model_id: str, port: int, voice: str) -> dict:
         "temperature": 0.0,
         "voice": voice,
         "speed": 1.0,
-        "audio_format": "mp3",
+        "audio_format": tts_audio_format(model_id),
         "provider": "",
     }
 

@@ -3,6 +3,7 @@
 from scripts.model_languages import (
     STT_MODEL_LANGUAGES,
     stt_languages,
+    tts_audio_format,
     tts_languages,
 )
 
@@ -20,6 +21,15 @@ def test_tts_model_wide_multilingual_voice():
     languages = tts_languages("x-ai/grok-voice-tts-1.0", "eve")
     assert languages is not None
     assert {"en", "de", "fr", "es"} <= set(languages)
+
+    gemini_languages = tts_languages("google/gemini-3.1-flash-tts-preview", "Kore")
+    assert gemini_languages is not None
+    assert "fi" in gemini_languages
+
+
+def test_tts_audio_format_uses_gemini_pcm_quirk():
+    assert tts_audio_format("google/gemini-3.1-flash-tts-preview") == "pcm"
+    assert tts_audio_format("x-ai/grok-voice-tts-1.0") == "mp3"
 
 
 def test_tts_locale_and_prefix_specific_voices():
