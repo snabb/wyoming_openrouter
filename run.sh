@@ -106,9 +106,14 @@ send_discovery() {
     # children of that (already-exited) subshell rather than of this
     # function -- the `wait` below wouldn't actually wait for them.
     task_list=$(mktemp)
-    jq -r '.tasks[] | "\(.name) \(.port)"' "$CONFIG_PATH" > "$task_list"
+    # Encode each task as one whitespace-safe record. Task names are free-form
+    # strings, so splitting a plain "name port" line breaks names with spaces.
+    jq -r '.tasks[] | @base64' "$CONFIG_PATH" > "$task_list"
 
-    while read -r name port; do
+    while IFS= read -r task_record; do
+        task_json=$(printf '%s' "$task_record" | base64 -d)
+        name=$(printf '%s' "$task_json" | jq -r '.name')
+        port=$(printf '%s' "$task_json" | jq -r '.port')
         discover_one_task "$name" "$port" "$discovery_host" &
     done < "$task_list"
     wait
