@@ -1,14 +1,14 @@
 [project]
 name = "wyoming-openrouter"
 version = "0.1.0"
-description = "Wyoming protocol server for OpenRouter speech-to-text (STT) APIs"
+description = "Wyoming protocol server for OpenRouter speech-to-text and text-to-speech APIs"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [
     { name = "Janne Snabb" }
 ]
-keywords = ["wyoming", "stt", "asr", "openrouter", "speech-to-text", "home-assistant"]
+keywords = ["wyoming", "stt", "tts", "asr", "openrouter", "speech-to-text", "text-to-speech", "home-assistant"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

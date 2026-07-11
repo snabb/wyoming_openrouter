@@ -46,9 +46,9 @@ jobs:
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
                   labels: |
-                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text and text-to-speech, for Home Assistant
                   annotations: |
-                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text and text-to-speech, for Home Assistant
 
             # metadata-action auto-generates org.opencontainers.image.licenses
             # from repo detection, which ends up meaningless/misleading for a
@@ -243,9 +243,9 @@ jobs:
                       type=raw,value=${{ steps.version.outputs.version }}
                       type=raw,value=${{ steps.version.outputs.short_sha }}
                   labels: |
-                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text and text-to-speech, for Home Assistant
                   annotations: |
-                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text, for Home Assistant
+                      org.opencontainers.image.description=Wyoming protocol server for OpenRouter speech-to-text and text-to-speech, for Home Assistant
 
             - name: Create manifest list and push
               working-directory: /tmp/digests
