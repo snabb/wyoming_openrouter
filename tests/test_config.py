@@ -106,6 +106,18 @@ def test_duplicate_ports_raise():
         )
 
 
+def test_duplicate_slugs_raise():
+    with pytest.raises(ConfigError, match="both map to slug 'living_room'"):
+        plan_tasks(
+            {
+                "tasks": [
+                    _stt_task(name="Living Room", port=10300),
+                    _stt_task(name="Living-Room", port=10301),
+                ]
+            }
+        )
+
+
 def test_privileged_port_raises():
     with pytest.raises(ConfigError, match="must be between"):
         plan_tasks({"tasks": [_stt_task(port=80)]})

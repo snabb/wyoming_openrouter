@@ -142,6 +142,7 @@ def plan_tasks(data: dict[str, Any]) -> list[TaskConfig]:
     tasks = [_parse_task(raw, i) for i, raw in enumerate(raw_tasks)]
 
     seen_ports: dict[int, str] = {}
+    seen_slugs: dict[str, str] = {}
     for task in tasks:
         if not (MIN_VALID_PORT <= task.port <= MAX_VALID_PORT):
             raise ConfigError(
@@ -154,6 +155,12 @@ def plan_tasks(data: dict[str, Any]) -> list[TaskConfig]:
                 f"port {task.port}"
             )
         seen_ports[task.port] = task.name
+        if task.slug in seen_slugs:
+            raise ConfigError(
+                f"tasks '{seen_slugs[task.slug]}' and '{task.name}' both map to "
+                f"slug {task.slug!r}; task names must produce unique slugs"
+            )
+        seen_slugs[task.slug] = task.name
 
     return tasks
 
