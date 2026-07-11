@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from wyoming_openrouter.mp3_decode import (
     DECODED_CHANNELS,
     DECODED_RATE,

@@ -70,7 +70,6 @@ from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.client import AsyncTcpClient
 from wyoming.info import Describe, Info
 from wyoming.tts import Synthesize, SynthesizeStopped
-
 from wyoming_openrouter.openrouter import list_stt_models, list_tts_models
 from wyoming_openrouter.util import slugify
 
@@ -220,17 +219,28 @@ async def do_synthesize(host: str, port: int, phrase: str, timeout: float):
 
 
 async def do_transcribe(
-    host: str, port: int, pcm: bytes, rate: int, width: int, channels: int, timeout: float
+    host: str,
+    port: int,
+    pcm: bytes,
+    rate: int,
+    width: int,
+    channels: int,
+    timeout: float,
 ):
     async with AsyncTcpClient(host, port) as client:
         t0 = time.monotonic()
         await client.write_event(Transcribe(language="en").event())
-        await client.write_event(AudioStart(rate=rate, width=width, channels=channels).event())
+        await client.write_event(
+            AudioStart(rate=rate, width=width, channels=channels).event()
+        )
         chunk_size = 4096
         for i in range(0, len(pcm), chunk_size):
             await client.write_event(
                 AudioChunk(
-                    audio=pcm[i : i + chunk_size], rate=rate, width=width, channels=channels
+                    audio=pcm[i : i + chunk_size],
+                    rate=rate,
+                    width=width,
+                    channels=channels,
                 ).event()
             )
         await client.write_event(AudioStop().event())
@@ -274,7 +284,9 @@ class LogCollector:
             pass
 
 
-def extract_stt_cost(lines: list[str], model: str) -> tuple[Optional[int], Optional[float]]:
+def extract_stt_cost(
+    lines: list[str], model: str
+) -> tuple[Optional[int], Optional[float]]:
     for line in lines:
         m = _RE_TRANSCRIBE.search(line)
         if m and m.group("model") == model:
@@ -396,7 +408,9 @@ async def run_matrix(
 
     total_combos = len(tts_by_id) * len(stt_by_id)
     if not pending:
-        print(f"All {total_combos} combination(s) already cached in {cache_dir} -- nothing to run.")
+        print(
+            f"All {total_combos} combination(s) already cached in {cache_dir} -- nothing to run."
+        )
         return list(results_by_key.values())
 
     print(
@@ -425,14 +439,18 @@ async def run_matrix(
         print(f"  skipping {tts_id!r}: no supported_voices listed in catalog")
         for stt_id in stt_ids_needed:
             if (tts_id, stt_id) in pending:
-                _record(tts_id, stt_id, "skipped: no supported_voices listed in catalog")
+                _record(
+                    tts_id, stt_id, "skipped: no supported_voices listed in catalog"
+                )
     if skipped:
         save_results_cache(cache_dir, results_cache)
 
     # stt_models_to_run is never empty here: pending is non-empty (checked
     # above) and every pending combo contributes its stt_id, so config always
     # has at least the STT tasks -- a subprocess is always needed below.
-    assert config["tasks"], "internal error: no tasks to run despite pending combinations"
+    assert config[
+        "tasks"
+    ], "internal error: no tasks to run despite pending combinations"
 
     process: Optional[asyncio.subprocess.Process] = None
     collector: Optional[LogCollector] = None
@@ -476,15 +494,25 @@ async def run_matrix(
                 cost = None
                 estimated = False
                 for _ in range(COST_WAIT_RETRIES):
-                    cost, estimated = extract_tts_cost(collector.new_lines_since(mark), tts_id)
+                    cost, estimated = extract_tts_cost(
+                        collector.new_lines_since(mark), tts_id
+                    )
                     if cost is not None:
                         break
                     await asyncio.sleep(COST_WAIT_DELAY)
 
                 audio_by_model[tts_id] = (pcm, rate, width, channels)
                 save_audio_to_cache(
-                    cache_dir, tts_id, pcm, rate, width, channels,
-                    tts_elapsed, cost, estimated, audio_manifest,
+                    cache_dir,
+                    tts_id,
+                    pcm,
+                    rate,
+                    width,
+                    channels,
+                    tts_elapsed,
+                    cost,
+                    estimated,
+                    audio_manifest,
                 )
                 print(
                     f"  ok: {len(pcm)} byte(s), latency={tts_elapsed}ms, "
@@ -536,7 +564,9 @@ async def run_matrix(
                     collector.new_lines_since(mark2), stt_id
                 )
                 result.transcript = transcript_text
-                result.stt_latency_ms = stt_latency if stt_latency is not None else stt_elapsed
+                result.stt_latency_ms = (
+                    stt_latency if stt_latency is not None else stt_elapsed
+                )
                 result.stt_cost = stt_cost
                 result.similarity = similarity_ratio(phrase, transcript_text)
                 result.success = result.similarity >= SIMILARITY_THRESHOLD
@@ -586,20 +616,26 @@ class LatencyStats:
     def compute(values: list[float]) -> "Optional[LatencyStats]":
         if not values:
             return None
-        return LatencyStats(mean=statistics.mean(values), min=min(values), max=max(values))
+        return LatencyStats(
+            mean=statistics.mean(values), min=min(values), max=max(values)
+        )
 
     def format(self) -> str:
         return f"{self.mean:.0f} / {self.min:.0f} / {self.max:.0f}"
 
 
-def build_report(results: list[ComboResult], phrase: str, elapsed_s: float) -> tuple[str, dict]:
+def build_report(
+    results: list[ComboResult], phrase: str, elapsed_s: float
+) -> tuple[str, dict]:
     tts_ids = sorted({r.tts_model for r in results})
     stt_ids = sorted({r.stt_model for r in results})
     by_pair = {(r.tts_model, r.stt_model): r for r in results}
 
     total_cost = sum(r.total_cost for r in results)
     unknown_cost_count = sum(
-        1 for r in results if r.error is None and (r.tts_cost is None or r.stt_cost is None)
+        1
+        for r in results
+        if r.error is None and (r.tts_cost is None or r.stt_cost is None)
     )
     passed = sum(1 for r in results if r.success)
     errored = sum(1 for r in results if r.error)
@@ -613,7 +649,11 @@ def build_report(results: list[ComboResult], phrase: str, elapsed_s: float) -> t
         f"Total combinations: {len(results)}",
         f"Passed: {passed} / {len(results)}  |  Errored: {errored}",
         f"**Total cost of this test run: ${total_cost:.6f}**"
-        + (f" (excludes {unknown_cost_count} combination(s) with unresolved cost)" if unknown_cost_count else ""),
+        + (
+            f" (excludes {unknown_cost_count} combination(s) with unresolved cost)"
+            if unknown_cost_count
+            else ""
+        ),
         "",
         "## Pass/fail matrix (rows: TTS model, columns: STT model)",
         "",
@@ -729,10 +769,16 @@ async def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--phrase", default=DEFAULT_PHRASE)
-    parser.add_argument("--stt-models", help="Comma-separated STT model ids to test (default: all)")
-    parser.add_argument("--tts-models", help="Comma-separated TTS model ids to test (default: all)")
+    parser.add_argument(
+        "--stt-models", help="Comma-separated STT model ids to test (default: all)"
+    )
+    parser.add_argument(
+        "--tts-models", help="Comma-separated TTS model ids to test (default: all)"
+    )
     parser.add_argument("--api-key", default=os.environ.get("OPENROUTER_API_KEY"))
-    parser.add_argument("--timeout", type=float, default=60.0, help="Per-request timeout (seconds)")
+    parser.add_argument(
+        "--timeout", type=float, default=60.0, help="Per-request timeout (seconds)"
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--output", default="model_matrix_report.md")
     parser.add_argument(
@@ -741,10 +787,14 @@ async def main() -> None:
         help="Where to persist results/audio so an interrupted run can resume (default: .model_matrix_cache)",
     )
     parser.add_argument(
-        "--fresh", action="store_true", help="Ignore/overwrite any existing cache for this phrase"
+        "--fresh",
+        action="store_true",
+        help="Ignore/overwrite any existing cache for this phrase",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="Only list the models/combos that would be tested"
+        "--dry-run",
+        action="store_true",
+        help="Only list the models/combos that would be tested",
     )
     args = parser.parse_args()
 
@@ -764,7 +814,9 @@ async def main() -> None:
         tts_models = [m for m in tts_models if m["id"] in wanted]
 
     total_combos = len(stt_models) * len(tts_models)
-    print(f"{len(stt_models)} STT model(s) x {len(tts_models)} TTS model(s) = {total_combos} combination(s)")
+    print(
+        f"{len(stt_models)} STT model(s) x {len(tts_models)} TTS model(s) = {total_combos} combination(s)"
+    )
     for m in stt_models:
         print(f"  STT: {m['id']}")
     for m in tts_models:
@@ -785,7 +837,13 @@ async def main() -> None:
 
     t_start = time.monotonic()
     results = await run_matrix(
-        args.host, stt_models, tts_models, args.api_key, args.phrase, args.timeout, cache_dir
+        args.host,
+        stt_models,
+        tts_models,
+        args.api_key,
+        args.phrase,
+        args.timeout,
+        cache_dir,
     )
     elapsed_s = time.monotonic() - t_start
 
@@ -797,7 +855,9 @@ async def main() -> None:
     passed = sum(1 for r in results if r.success)
     total_cost = sum(r.total_cost for r in results)
     print(f"\nReport written to {args.output} and {json_path}")
-    print(f"{passed}/{len(results)} combinations passed. Total cost: ${total_cost:.6f}. Took {elapsed_s:.0f}s.")
+    print(
+        f"{passed}/{len(results)} combinations passed. Total cost: ${total_cost:.6f}. Took {elapsed_s:.0f}s."
+    )
 
 
 if __name__ == "__main__":

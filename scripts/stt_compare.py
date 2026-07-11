@@ -53,8 +53,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from wyoming.asr import Transcribe, Transcript  # noqa: E402
 from wyoming.audio import AudioChunk, AudioStart, AudioStop  # noqa: E402
 from wyoming.client import AsyncTcpClient  # noqa: E402
-
-from wyoming_openrouter.openrouter import OpenRouterError, transcribe  # noqa: E402
+from wyoming_openrouter.openrouter import (  # noqa: E402
+    OpenRouterError,
+    transcribe,
+)
 
 # Comma-separated host:port entries for remote Wyoming STT servers to
 # compare against alongside the OpenRouter models above -- e.g. a

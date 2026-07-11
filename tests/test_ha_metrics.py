@@ -4,7 +4,6 @@ import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from wyoming_openrouter.ha_metrics import Metrics, push_to_supervisor
 
 

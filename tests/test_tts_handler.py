@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, patch
 from wyoming.audio import AudioChunk
 from wyoming.info import Describe, Info
 from wyoming.tts import Synthesize, SynthesizeVoice
-
 from wyoming_openrouter.config import plan_tasks
 from wyoming_openrouter.ha_metrics import Metrics
 from wyoming_openrouter.openrouter import SpeechMeta

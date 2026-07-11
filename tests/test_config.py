@@ -1,7 +1,6 @@
 """Tests for wyoming_openrouter.config."""
 
 import pytest
-
 from wyoming_openrouter.config import ConfigError, plan_tasks
 
 

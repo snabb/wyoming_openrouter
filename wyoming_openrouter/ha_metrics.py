@@ -120,7 +120,9 @@ def _push_one(entity_id: str, state: dict[str, Any], token: str) -> None:
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
-    response = requests.post(url, headers=headers, json=state, timeout=_PUSH_TIMEOUT_SECONDS)
+    response = requests.post(
+        url, headers=headers, json=state, timeout=_PUSH_TIMEOUT_SECONDS
+    )
     response.raise_for_status()
 
 
@@ -139,4 +141,6 @@ async def push_to_supervisor(metrics: Metrics) -> None:
         try:
             await asyncio.to_thread(_push_one, entity_id, state, token)
         except Exception:
-            _LOGGER.warning("Failed to push %s to Home Assistant", entity_id, exc_info=True)
+            _LOGGER.warning(
+                "Failed to push %s to Home Assistant", entity_id, exc_info=True
+            )

@@ -24,7 +24,10 @@ async def main() -> None:
         event = await client.read_event()
 
     if event is None or not Info.is_type(event.type):
-        print("FAIL: did not receive an Info event in response to Describe", file=sys.stderr)
+        print(
+            "FAIL: did not receive an Info event in response to Describe",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Matches job-docker.yml's smoke-test task, named "smoke-test" -- the
@@ -39,7 +42,9 @@ async def main() -> None:
         print("FAIL: no models advertised", file=sys.stderr)
         sys.exit(1)
 
-    print(f"OK: asr program '{info.asr[0].name}' with models: {[m.name for m in info.asr[0].models]}")
+    print(
+        f"OK: asr program '{info.asr[0].name}' with models: {[m.name for m in info.asr[0].models]}"
+    )
 
 
 if __name__ == "__main__":

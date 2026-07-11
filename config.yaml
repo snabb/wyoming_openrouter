@@ -39,26 +39,26 @@ homeassistant_api: true
 # this add-on's containers over the internal Supervisor network regardless
 # of what's published here.
 ports:
-    10300/tcp: null
-    10301/tcp: null
-    10302/tcp: null
-    10303/tcp: null
-    10304/tcp: null
-    10305/tcp: null
-    10306/tcp: null
-    10307/tcp: null
-    10308/tcp: null
-    10309/tcp: null
-    10310/tcp: null
-    10311/tcp: null
-    10312/tcp: null
-    10313/tcp: null
-    10314/tcp: null
-    10315/tcp: null
-    10316/tcp: null
-    10317/tcp: null
-    10318/tcp: null
-    10319/tcp: null
+    10300/tcp:
+    10301/tcp:
+    10302/tcp:
+    10303/tcp:
+    10304/tcp:
+    10305/tcp:
+    10306/tcp:
+    10307/tcp:
+    10308/tcp:
+    10309/tcp:
+    10310/tcp:
+    10311/tcp:
+    10312/tcp:
+    10313/tcp:
+    10314/tcp:
+    10315/tcp:
+    10316/tcp:
+    10317/tcp:
+    10318/tcp:
+    10319/tcp:
 ports_description:
     10300/tcp: Task port (if configured)
     10301/tcp: Task port (if configured)
@@ -97,35 +97,35 @@ options:
     debug: false
     tasks:
         - name: kitchen-stt
-          api_key: ""
+          api_key: ''
           type: stt
           port: 10300
           model: openai/gpt-4o-mini-transcribe
           timeout: 60
           language: en
-          default_language: ""
+          default_language: ''
           temperature: 0.0
-          voice: ""
+          voice: ''
           speed: 1.0
           audio_format: pcm
-          provider: ""
+          provider: ''
 
 schema:
     debug: bool
     tasks:
         - name: str
           api_key: password
-          type: "list(stt|tts)"
+          type: list(stt|tts)
           port: port
           model: str
-          timeout: "int(1,300)?"
-          language: "str?"
-          default_language: "str?"
-          temperature: "float(0,1)?"
-          voice: "str?"
-          speed: "float(0,10)?"
-          audio_format: "list(pcm|mp3)?"
-          provider: "str?"
+          timeout: int(1,300)?
+          language: str?
+          default_language: str?
+          temperature: float(0,1)?
+          voice: str?
+          speed: float(0,10)?
+          audio_format: list(pcm|mp3)?
+          provider: str?
 
 # Panel
 panel_icon: mdi:microphone-message

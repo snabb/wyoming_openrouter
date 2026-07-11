@@ -7,11 +7,13 @@ from unittest.mock import AsyncMock, patch
 from wyoming.asr import Transcribe, Transcript
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
 from wyoming.info import Describe, Info
-
 from wyoming_openrouter.config import plan_tasks
 from wyoming_openrouter.ha_metrics import Metrics
 from wyoming_openrouter.openrouter import TranscriptionResult
-from wyoming_openrouter.stt_handler import OpenRouterSttEventHandler, get_stt_wyoming_info
+from wyoming_openrouter.stt_handler import (
+    OpenRouterSttEventHandler,
+    get_stt_wyoming_info,
+)
 
 
 def _task(**overrides):
@@ -120,7 +122,9 @@ def test_empty_audio_skips_api_call_and_returns_empty_transcript():
     handler = _RecordingHandler()
 
     with (
-        patch("wyoming_openrouter.stt_handler.openrouter.transcribe") as mock_transcribe,
+        patch(
+            "wyoming_openrouter.stt_handler.openrouter.transcribe"
+        ) as mock_transcribe,
         patch(
             "wyoming_openrouter.stt_handler.push_to_supervisor", new=AsyncMock()
         ) as mock_push,
@@ -137,7 +141,9 @@ def test_empty_audio_skips_api_call_and_returns_empty_transcript():
 
 def test_task_model_and_params_passed_through():
     fake_result = TranscriptionResult(text="ok", cost=0.0, elapsed_ms=1, usage={})
-    task = _task(model="openai/whisper-1", temperature=0.2, provider='{"order":["openai"]}')
+    task = _task(
+        model="openai/whisper-1", temperature=0.2, provider='{"order":["openai"]}'
+    )
     handler = _RecordingHandler(task=task)
 
     with (
