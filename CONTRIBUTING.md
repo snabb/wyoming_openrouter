@@ -16,6 +16,9 @@ The version must be updated in **three** places (keep them in sync):
 2. `wyoming_openrouter/__init__.py` — `__version__ = "X.Y.Z"`
 3. `config.yaml` — `version: X.Y.Z` (Home Assistant app version)
 
+`tests/test_versions.py` enforces that these values remain equal before an
+image can be published.
+
 Then update `CHANGELOG.md` with the changes.
 
 Commit and push to `master`. CI then builds and publishes
