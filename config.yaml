@@ -2,7 +2,7 @@
 # Home Assistant App Configuration (Supervisor add-on manifest)
 # https://developers.home-assistant.io/docs/add-ons/configuration
 name: Wyoming OpenRouter
-version: 0.2.0
+version: 0.3.0
 slug: wyoming_openrouter
 description: >-
     Speech-to-text and text-to-speech using OpenRouter's hosted models.

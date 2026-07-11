@@ -160,7 +160,7 @@ jobs:
                         "type": "stt",
                         "port": 10300,
                         "model": "openai/gpt-4o-mini-transcribe",
-                        "language": "en"
+                        "languages": ["en"]
                       }
                     ]
                   }

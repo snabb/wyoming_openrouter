@@ -1,11 +1,6 @@
 """Tests for the curated OpenRouter speech language map."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
-
-from model_languages import (  # noqa: E402
+from scripts.model_languages import (
     STT_MODEL_LANGUAGES,
     stt_languages,
     tts_languages,
@@ -28,14 +23,10 @@ def test_tts_model_wide_multilingual_voice():
 
 
 def test_tts_locale_and_prefix_specific_voices():
-    assert tts_languages("microsoft/mai-voice-2", "de-DE-Klaus:MAI-Voice-2") == (
-        "de",
-    )
+    assert tts_languages("microsoft/mai-voice-2", "de-DE-Klaus:MAI-Voice-2") == ("de",)
     assert tts_languages("hexgrad/kokoro-82m", "ff_siwis") == ("fr",)
     assert tts_languages("hexgrad/kokoro-82m", "af_nova") == ("en",)
-    assert tts_languages("mistralai/voxtral-mini-tts-2603", "gb_jane_sad") == (
-        "en",
-    )
+    assert tts_languages("mistralai/voxtral-mini-tts-2603", "gb_jane_sad") == ("en",)
 
 
 def test_tts_unknown_model_or_voice_returns_none():
