@@ -1,6 +1,6 @@
 [project]
 name = "wyoming-openrouter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Wyoming protocol server for OpenRouter speech-to-text and text-to-speech APIs"
 readme = "README.md"
 license = "MIT"

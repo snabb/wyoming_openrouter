@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-11
+
+### Added
+
+- `stt_compare.py` for recording one utterance and comparing it across
+  configured Wyoming endpoints and OpenRouter STT models.
+- Per-field Home Assistant app configuration help, multi-voice setup guidance,
+  and documentation of TTS instruction passthrough and STT prompt limitations.
+- Release metadata consistency checks across the Python package, server, and
+  Home Assistant app versions.
+
+### Changed
+
+- Model-catalog fetching and Home Assistant discovery now run concurrently and
+  no longer delay task port binding or container health checks.
+- Docker images are built and smoke-tested natively on amd64 and arm64 before
+  the multi-architecture release tags are published.
+- Wyoming health and readiness probes now use a protocol-aware Python client
+  instead of waiting for `nc` timeouts.
+
+### Fixed
+
+- Propagate OpenRouter MP3 stream failures and `mpg123` decode failures instead
+  of returning a successful empty audio response.
+- Preserve task names containing spaces during Home Assistant discovery.
+- Record TTS request metrics when OpenRouter omits the generation ID.
+- Reject task-name slug collisions that would overwrite metric sensors.
+- Report malformed standalone task configuration as field-specific errors.
+- Require usable STT languages and TTS language metadata so Home Assistant can
+  create and select the advertised entities reliably.
+- Publish the Home Assistant app's exact versioned image tag and prevent future
+  releases from publishing before native smoke tests pass.
+
 ## [0.1.0] - 2026-07-06
 
 ### Added
