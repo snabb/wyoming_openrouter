@@ -317,6 +317,29 @@ def test_cost_recorded_as_unknown_for_outlier_model_when_lookup_never_resolves()
     assert handler.metrics.unknown_cost_count == 1
 
 
+def test_missing_generation_id_records_request_with_unknown_cost():
+    meta = _fake_meta(generation_id=None)
+    handler = _RecordingHandler(tts_pricing={})
+    with (
+        patch(
+            "wyoming_openrouter.tts_handler.openrouter.synthesize_stream",
+            return_value=(meta, iter([b"\x00\x01"])),
+        ),
+        patch(
+            "wyoming_openrouter.tts_handler.openrouter.get_generation_cost"
+        ) as mock_cost,
+        patch(
+            "wyoming_openrouter.tts_handler.push_to_supervisor", new=AsyncMock()
+        ) as mock_push,
+    ):
+        _run(_run_synthesize(handler))
+
+    mock_cost.assert_not_called()
+    assert handler.metrics.request_count == 1
+    assert handler.metrics.unknown_cost_count == 1
+    mock_push.assert_awaited_once()
+
+
 def test_audio_stop_and_synthesize_stopped_written_before_cost_resolution_completes():
     meta = _fake_meta()
     handler = _RecordingHandler()

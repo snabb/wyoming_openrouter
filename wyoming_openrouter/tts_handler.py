@@ -165,6 +165,7 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
         chunk_count = 0
         audio_bytes = 0
         generation_id: Optional[str] = None
+        speech_response_received = False
         audio_start_sent = False
         t_start = time.monotonic()
 
@@ -181,6 +182,7 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
                     self.task.timeout,
                     self.task.audio_format,
                 )
+                speech_response_received = True
                 generation_id = meta.generation_id
                 if self.task.audio_format == "mp3":
                     # meta.rate/width/channels describe OpenRouter's own pcm
@@ -235,7 +237,7 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
             elapsed_ms,
         )
 
-        if generation_id:
+        if speech_response_received:
             task = asyncio.create_task(
                 self._resolve_cost(generation_id, text, elapsed_ms)
             )
@@ -243,7 +245,7 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
             task.add_done_callback(self._background_tasks.discard)
 
     async def _resolve_cost(
-        self, generation_id: str, text: str, elapsed_ms: int
+        self, generation_id: Optional[str], text: str, elapsed_ms: int
     ) -> None:
         """Fire-and-forget: resolve real cost, then log + record metrics.
 
@@ -251,16 +253,17 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
         sent, so a slow or failed cost lookup never delays audio delivery.
         """
         cost: Optional[float] = None
-        for delay in _COST_LOOKUP_DELAYS:
-            await asyncio.sleep(delay)
-            cost = await asyncio.to_thread(
-                openrouter.get_generation_cost,
-                self.task.api_key,
-                generation_id,
-                self.task.timeout,
-            )
-            if cost is not None:
-                break
+        if generation_id:
+            for delay in _COST_LOOKUP_DELAYS:
+                await asyncio.sleep(delay)
+                cost = await asyncio.to_thread(
+                    openrouter.get_generation_cost,
+                    self.task.api_key,
+                    generation_id,
+                    self.task.timeout,
+                )
+                if cost is not None:
+                    break
 
         estimated = False
         if cost is None:
@@ -279,9 +282,8 @@ class OpenRouterTtsEventHandler(AsyncEventHandler):
             )
         else:
             self._logger.warning(
-                "Could not resolve or estimate cost for generation_id=%s; "
-                "recording as unknown",
-                generation_id,
+                "Could not resolve or estimate synthesis cost%s; recording as unknown",
+                f" for generation_id={generation_id}" if generation_id else "",
             )
 
         self.metrics.record(elapsed_ms, cost)
